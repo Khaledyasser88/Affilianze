@@ -197,9 +197,23 @@ Be specific. Extract real information from the document.
   try {
     const clean = raw.replace(/```json|```/g, '').trim()
     const jsonMatch = clean.match(/\{[\s\S]*\}/)
-    return JSON.parse(jsonMatch ? jsonMatch[0] : clean)
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : clean)
+    
+    // Ensure we have at least some data, otherwise trigger fallback
+    if (!parsed.skills && !parsed.niche && !parsed.bio) {
+       throw new Error('Empty AI response')
+    }
+
+    return {
+      fullName: parsed.fullName || '',
+      bio: parsed.bio || 'Professional marketer',
+      niche: parsed.niche || 'Digital Marketing',
+      skills: parsed.skills || 'Marketing',
+      experienceLevel: parsed.experienceLevel || 'Mid-Level',
+      summary: parsed.summary || 'Ready for affiliate campaigns'
+    }
   } catch {
-    // Fallback if parsing fails
+    // Fallback if parsing fails or result is empty
     return {
       fullName: '',
       bio: 'A passionate digital marketer with experience in content creation and audience growth.',
