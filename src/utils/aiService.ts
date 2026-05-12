@@ -9,19 +9,29 @@ const GROQ_KEY     = () => (import.meta as any).env.VITE_GROQ_API_KEY as string
 
 // ─── Core AI Calls with Fallback ──────────────────────────────────────────────
 
-async function callAI(prompt: string): Promise<string> {
+async function callAI(prompt: string, retryCount = 0): Promise<string> {
   try {
     return await callGemini(prompt)
   } catch (err: any) {
+    if (err.message?.includes('429') && retryCount < 1) {
+      console.warn('Gemini busy, retrying in 2s...')
+      await new Promise(r => setTimeout(r, 2000))
+      return await callAI(prompt, retryCount + 1)
+    }
     console.warn('Gemini failed, falling back to Groq:', err.message)
     return await callGroq(prompt)
   }
 }
 
-async function callAIWithFile(fileBase64: string, mimeType: string, prompt: string): Promise<string> {
+async function callAIWithFile(fileBase64: string, mimeType: string, prompt: string, retryCount = 0): Promise<string> {
   try {
     return await callGeminiWithFile(fileBase64, mimeType, prompt)
   } catch (err: any) {
+    if (err.message?.includes('429') && retryCount < 1) {
+      console.warn('Gemini Vision busy, retrying in 2s...')
+      await new Promise(r => setTimeout(r, 2000))
+      return await callAIWithFile(fileBase64, mimeType, prompt, retryCount + 1)
+    }
     console.warn('Gemini Vision failed, falling back to Groq Vision:', err.message)
     return await callGroqWithFile(fileBase64, mimeType, prompt)
   }
@@ -112,8 +122,8 @@ async function callGroqWithFile(
   if (!key) throw new Error('VITE_GROQ_API_KEY missing')
 
   // PDF to Text fallback for Groq since it doesn't support PDF directly easily via simple chat API
-  // But for images, we use Llama 3.2 Vision (90B version as 11B is decommissioned)
-  const model = mimeType.includes('pdf') ? 'llama-3.3-70b-versatile' : 'llama-3.2-90b-vision-preview'
+  // But for images, we use Llama-4-Scout (Multimodal)
+  const model = mimeType.includes('pdf') ? 'llama-3.3-70b-versatile' : 'meta-llama/llama-4-scout-17b-16e-instruct'
   
   const content: any[] = [{ type: 'text', text: prompt }]
   if (!mimeType.includes('pdf')) {
