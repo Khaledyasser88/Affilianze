@@ -38,7 +38,7 @@ export default function Navbar() {
         <div className="flex-1 flex justify-start items-center">
           <Link to="/" className="flex items-center group gap-0.5">
             <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
+              initial={isHome ? { scale: 0.5, opacity: 0 } : false}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
             >
@@ -50,7 +50,7 @@ export default function Navbar() {
               />
             </motion.div>
             <motion.span 
-              initial={{ width: 0, opacity: 0, x: -10 }}
+              initial={isHome ? { width: 0, opacity: 0, x: -10 } : false}
               animate={{ width: "auto", opacity: 1, x: 0 }}
               transition={{ delay: 0.5, duration: 0.8, ease: "easeOut" }}
               className="text-[26px] font-bold tracking-tight -ml-2 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] bg-clip-text text-transparent overflow-hidden whitespace-nowrap"
