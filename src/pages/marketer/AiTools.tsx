@@ -145,10 +145,10 @@ export default function AiTools() {
       } catch {}
 
       setCvAnalysis({ 
-        skills: parsed.skills.split(',').map(s => s.trim()), 
-        experienceLevel: parsed.experienceLevel,
-        suggestedNiches: parsed.niche.split(',').map(s => s.trim()),
-        summary: parsed.summary,
+        skills: (parsed.skills || '').split(',').map(s => s.trim()).filter(Boolean), 
+        experienceLevel: parsed.experienceLevel || 'Mid-Level',
+        suggestedNiches: (parsed.niche || '').split(',').map(s => s.trim()).filter(Boolean),
+        summary: parsed.summary || parsed.bio || 'Analysis complete.',
         matchedCampaigns 
       })
       toast.success('CV analyzed successfully!')
