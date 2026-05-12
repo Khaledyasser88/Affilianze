@@ -482,33 +482,33 @@ export default function Signup() {
                               (idAnalysis.name.toLowerCase() === 'not readable' ? 'text-yellow-800' : 'text-green-800')
                             }`}>
                               {!idAnalysis.isValid ? 'Verification Issue' : 
-                               (idAnalysis.name.toLowerCase() === 'not readable' ? 'صورة غير واضحة' : 'Verification Success')}
+                               (idAnalysis.name.toLowerCase() === 'not readable' ? 'Unclear Image' : 'Verification Success')}
                             </p>
                             <p className={`text-[12px] leading-relaxed mb-3 ${
                               !idAnalysis.isValid ? 'text-red-600' : 
                               (idAnalysis.name.toLowerCase() === 'not readable' ? 'text-yellow-700' : 'text-green-600')
                             }`}>
                               {idAnalysis.name.toLowerCase() === 'not readable' 
-                                ? 'يرجى رفع صورة واضحة لاستكمال البيانات' 
+                                ? 'Please upload a clearer photo to complete your data.' 
                                 : idAnalysis.message}
                             </p>
                             
                             {idAnalysis.isValid && idAnalysis.name && idAnalysis.name.toLowerCase() !== 'not readable' && (
                               <div className="mt-4 space-y-3 p-3 bg-white/50 rounded-lg border border-green-100/50">
                                 <div className="grid grid-cols-2 gap-2 text-[11px]">
-                                  <div className="text-green-800/60 font-medium">الاسم المستخرج:</div>
+                                  <div className="text-green-800/60 font-medium">Detected Name:</div>
                                   <div className="text-green-900 font-bold">{idAnalysis.name}</div>
                                   
                                   {idAnalysis.idNumber && (
                                     <>
-                                      <div className="text-green-800/60 font-medium">رقم البطاقة:</div>
+                                      <div className="text-green-800/60 font-medium">ID Number:</div>
                                       <div className="text-green-900 font-bold">{idAnalysis.idNumber}</div>
                                     </>
                                   )}
                                   
                                   {idAnalysis.address && (
                                     <>
-                                      <div className="text-green-800/60 font-medium">العنوان:</div>
+                                      <div className="text-green-800/60 font-medium">Address:</div>
                                       <div className="text-green-900 font-bold line-clamp-1">{idAnalysis.address}</div>
                                     </>
                                   )}
@@ -526,12 +526,12 @@ export default function Signup() {
                                       lastName,
                                       address: idAnalysis.address || prev.address 
                                     }))
-                                    toast.success('تم استكمال البيانات بنجاح')
+                                    toast.success('Information applied successfully')
                                   }}
                                   className="w-full flex items-center justify-center gap-2 py-2 bg-green-600 text-white text-[12px] font-bold rounded-lg hover:bg-green-700 transition-all shadow-sm hover:shadow-md"
                                 >
                                   <Sparkles className="w-3.5 h-3.5" />
-                                  استكمال البيانات من البطاقة
+                                  Complete Data from ID
                                 </button>
                               </div>
                             )}

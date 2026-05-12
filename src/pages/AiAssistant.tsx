@@ -42,6 +42,7 @@ export default function AiAssistant() {
   })
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [language, setLanguage] = useState<'English' | 'Arabic'>('English')
   const scrollRef = useRef<HTMLDivElement>(null)
   const typingRef = useRef<boolean>(false)
 
@@ -94,7 +95,7 @@ export default function AiAssistant() {
 
     try {
       const recentActions = activityTracker.getActivities().slice(0, 3).map((a: any) => a.description).join(', ')
-      const systemPrompt = `You are "Genie", the official AI assistant for Affilianze. User: ${name} (${role}). Recent Actions: ${recentActions}. Provide concise, professional, and helpful affiliate marketing advice.`
+      const systemPrompt = `You are "Genie", the official AI assistant for Affilianze. User: ${name} (${role}). Recent Actions: ${recentActions}. Provide concise, professional, and helpful affiliate marketing advice. IMPORTANT: Always respond in ${language}. If Arabic, use modern standard Arabic.`
 
       let aiResponse: string | null = null
 
@@ -156,9 +157,25 @@ export default function AiAssistant() {
     <div className="max-w-5xl mx-auto h-[calc(100vh-80px)] flex flex-col bg-white overflow-hidden pt-4">
       {/* Quick Prompts - Screenshot Style */}
       <div className="px-6 md:px-12 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Lightbulb className="w-5 h-5 text-amber-500 fill-amber-500/20" />
-          <h2 className="text-sm font-bold text-[#1E3A8A]">Quick Prompts:</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Lightbulb className="w-5 h-5 text-amber-500 fill-amber-500/20" />
+            <h2 className="text-sm font-bold text-[#1E3A8A]">Quick Prompts:</h2>
+          </div>
+          <div className="flex bg-slate-100 p-1 rounded-lg">
+            <button 
+              onClick={() => setLanguage('English')}
+              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${language === 'English' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              English
+            </button>
+            <button 
+              onClick={() => setLanguage('Arabic')}
+              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${language === 'Arabic' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              العربية
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-2 px-2">
           {STATIC_PROMPTS.map((p, i) => (
