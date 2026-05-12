@@ -469,17 +469,31 @@ export default function Signup() {
                       />
                       
                       {idAnalysis && (
-                        <div className={`p-4 rounded-xl border flex items-start gap-3 transition-all animate-in fade-in slide-in-from-top-2 ${idAnalysis.isValid ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
-                          {idAnalysis.isValid ? <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" /> : <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />}
+                        <div className={`p-4 rounded-xl border flex items-start gap-3 transition-all animate-in fade-in slide-in-from-top-2 ${
+                          !idAnalysis.isValid ? 'bg-red-50 border-red-100' : 
+                          (idAnalysis.name.toLowerCase() === 'not readable' ? 'bg-yellow-50 border-yellow-100' : 'bg-green-50 border-green-100')
+                        }`}>
+                          {!idAnalysis.isValid ? <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" /> : 
+                           (idAnalysis.name.toLowerCase() === 'not readable' ? <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" /> : <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />)}
+                          
                           <div className="flex-1">
-                            <p className={`text-[13px] font-bold mb-1 ${idAnalysis.isValid ? 'text-green-800' : 'text-red-800'}`}>
-                              {idAnalysis.isValid ? 'Verification Success' : 'Verification Issue'}
+                            <p className={`text-[13px] font-bold mb-1 ${
+                              !idAnalysis.isValid ? 'text-red-800' : 
+                              (idAnalysis.name.toLowerCase() === 'not readable' ? 'text-yellow-800' : 'text-green-800')
+                            }`}>
+                              {!idAnalysis.isValid ? 'Verification Issue' : 
+                               (idAnalysis.name.toLowerCase() === 'not readable' ? 'صورة غير واضحة' : 'Verification Success')}
                             </p>
-                            <p className={`text-[12px] leading-relaxed mb-3 ${idAnalysis.isValid ? 'text-green-600' : 'text-red-600'}`}>
-                              {idAnalysis.message}
+                            <p className={`text-[12px] leading-relaxed mb-3 ${
+                              !idAnalysis.isValid ? 'text-red-600' : 
+                              (idAnalysis.name.toLowerCase() === 'not readable' ? 'text-yellow-700' : 'text-green-600')
+                            }`}>
+                              {idAnalysis.name.toLowerCase() === 'not readable' 
+                                ? 'يرجى رفع صورة واضحة لاستكمال البيانات' 
+                                : idAnalysis.message}
                             </p>
                             
-                            {idAnalysis.isValid && idAnalysis.name && idAnalysis.name !== 'Not readable' && (
+                            {idAnalysis.isValid && idAnalysis.name && idAnalysis.name.toLowerCase() !== 'not readable' && (
                               <button 
                                 type="button"
                                 onClick={() => {
