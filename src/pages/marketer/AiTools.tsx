@@ -26,65 +26,7 @@ interface GeneratedPost {
   copied: boolean
 }
 
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY as string
-
-async function callGemini(prompt: string): Promise<string> {
-  if (!GEMINI_KEY) throw new Error('Gemini API key not configured. Add VITE_GEMINI_API_KEY to .env')
-  
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 2048, temperature: 0.7 }
-      })
-    }
-  )
-  const data = await res.json()
-  if (data.error) throw new Error(data.error.message)
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) throw new Error('Empty response from AI')
-  return text
-}
-
-async function callGeminiWithFile(file: File, prompt: string): Promise<string> {
-  if (!GEMINI_KEY) throw new Error('Gemini API key not configured')
-  
-  // Convert file to base64
-  const base64 = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result as string
-      resolve(result.split(',')[1]) // Remove data:xxx;base64, prefix
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inlineData: { mimeType: file.type || 'application/pdf', data: base64 } },
-            { text: prompt }
-          ]
-        }],
-        generationConfig: { maxOutputTokens: 2048, temperature: 0.7 }
-      })
-    }
-  )
-  const data = await res.json()
-  if (data.error) throw new Error(data.error.message)
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) throw new Error('Empty response from AI')
-  return text
-}
+import { analyzeCVWithAI, generateMarketingPosts } from '../../utils/aiService'
 
 export default function AiTools() {
   const [activeTab, setActiveTab] = useState<TabKey>('cv')
@@ -189,36 +131,12 @@ export default function AiTools() {
       formData.append('CvFile', file)
       marketerApi.putmycv(formData).catch(() => {})
 
-      const prompt = `You are an expert HR analyst and career advisor for affiliate marketers.
-Analyze this CV/resume document and return ONLY a valid JSON object (no markdown, no code fences, no explanation):
-{
-  "skills": ["skill1", "skill2", "skill3", "skill4", "skill5"],
-  "experienceLevel": "Junior" or "Mid-Level" or "Senior",
-  "suggestedNiches": ["niche1", "niche2", "niche3"],
-  "summary": "A 2-sentence professional summary of this person's strengths for affiliate marketing"
-}
-
-Be specific and extract real skills from the document. If you can't read it properly, make reasonable inferences from any visible text.`
-
-      const result = await callGeminiWithFile(file, prompt)
-      
-      let parsed: any
-      try {
-        const jsonMatch = result.match(/\{[\s\S]*\}/)
-        parsed = JSON.parse(jsonMatch ? jsonMatch[0] : result)
-      } catch {
-        parsed = {
-          skills: ['Digital Marketing', 'Social Media', 'Content Creation', 'SEO', 'Communication'],
-          experienceLevel: 'Mid-Level',
-          suggestedNiches: ['Digital Marketing', 'Social Media Marketing', 'E-commerce'],
-          summary: 'A versatile marketing professional with experience in digital campaigns and content creation. Well-suited for affiliate marketing roles requiring creativity and analytical skills.'
-        }
-      }
+      const parsed = await analyzeCVWithAI(file)
 
       // Fetch matching campaigns
       let matchedCampaigns: any[] = []
       try {
-        const keyword = parsed.suggestedNiches?.[0] || parsed.skills?.[0] || ''
+        const keyword = parsed.niche?.split(',')[0] || parsed.skills?.split(',')[0] || ''
         const searchRes = await campaignApi.getsearch({ IsActive: true, Keyword: keyword, PageSize: 5 })
         matchedCampaigns = ((searchRes as any)?.data || []).filter((c: any) => {
           const t = (c.title || '').toLowerCase()
@@ -226,7 +144,13 @@ Be specific and extract real skills from the document. If you can't read it prop
         }).slice(0, 4)
       } catch {}
 
-      setCvAnalysis({ ...parsed, matchedCampaigns })
+      setCvAnalysis({ 
+        skills: parsed.skills.split(',').map(s => s.trim()), 
+        experienceLevel: parsed.experienceLevel,
+        suggestedNiches: parsed.niche.split(',').map(s => s.trim()),
+        summary: parsed.summary,
+        matchedCampaigns 
+      })
       toast.success('CV analyzed successfully!')
     } catch (err: any) {
       console.error('CV Analysis error:', err)
@@ -258,35 +182,7 @@ Be specific and extract real skills from the document. If you can't read it prop
       const campDesc = selectedCampaign.description || selectedCampaign.campaignDescription || ''
       const commission = selectedCampaign.commissionRate || selectedCampaign.commission || ''
 
-      const prompt = `You are an expert social media marketer. Create 3 unique marketing posts for different platforms.
-
-Campaign: ${campTitle}
-Description: ${campDesc}
-Commission: ${commission}
-${customPrompt ? `Additional Context: ${customPrompt}` : ''}
-
-Return ONLY a valid JSON array (no markdown fences, no explanation, just the array):
-[
-  {"platform": "Instagram", "content": "engaging post text with emojis (2-3 paragraphs)", "hashtags": "#hashtag1 #hashtag2 #hashtag3 #hashtag4 #hashtag5"},
-  {"platform": "Twitter", "content": "concise engaging tweet under 280 chars with emojis", "hashtags": "#hashtag1 #hashtag2 #hashtag3"},
-  {"platform": "LinkedIn", "content": "professional marketing post (2-3 paragraphs)", "hashtags": "#hashtag1 #hashtag2 #hashtag3 #hashtag4"}
-]
-
-Make each post unique, engaging, and perfectly optimized for its specific platform. Use relevant emojis.`
-
-      const result = await callGemini(prompt)
-      
-      let parsed: any[]
-      try {
-        const jsonMatch = result.match(/\[[\s\S]*\]/)
-        parsed = JSON.parse(jsonMatch ? jsonMatch[0] : result)
-      } catch {
-        parsed = [
-          { platform: 'Instagram', content: `🔥 Ready to level up? ${campTitle} is here!\n\nThis is your chance to be part of something amazing. Don't wait — the best opportunities don't last forever! 💰✨\n\nTap the link in bio to get started today!`, hashtags: '#affiliate #marketing #opportunity #growth #success' },
-          { platform: 'Twitter', content: `💰 ${campTitle} is live! Don't miss your chance to earn with this amazing campaign. Join now! 🚀`, hashtags: '#affiliate #marketing #earnonline' },
-          { platform: 'LinkedIn', content: `Excited to share an incredible opportunity: ${campTitle}\n\nThis campaign offers a unique chance for marketers to grow their portfolio while earning competitive commissions.\n\nIf you're passionate about digital marketing, this is for you.`, hashtags: '#marketing #growth #digitalmarketing #affiliate' }
-        ]
-      }
+      const parsed = await generateMarketingPosts(campTitle, campDesc, customPrompt)
 
       const iconMap: Record<string, any> = { Instagram, Twitter, LinkedIn: Linkedin }
       setGeneratedPosts(parsed.map(p => ({
