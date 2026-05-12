@@ -68,10 +68,15 @@ export default function Signup() {
         const detectedIdName = (idAnalysis?.name || '').trim().toLowerCase().replace(/\s+/g, ' ')
         const detectedCvName = (cvAnalysis?.fullName || '').trim().toLowerCase().replace(/\s+/g, ' ')
         
-        // 1. Check ID Name Match
-        if (idAnalysis && idAnalysis.isValid && detectedIdName !== 'not readable') {
+        // 1. Check ID Readability and Name Match
+        if (idAnalysis && idAnalysis.isValid) {
+          if (detectedIdName === 'not readable' || !detectedIdName) {
+            setError('Could not read your National ID clearly. Please upload a high-quality, clear photo of your ID (Front View) so we can verify your name.')
+            setLoading(false)
+            return
+          }
+
           // Check if entered name is contained in or matches ID name
-          // National IDs usually have full 4 names, so we check if the first and last name exist in it
           const idNameParts = detectedIdName.split(' ')
           const fName = form.firstName.trim().toLowerCase()
           const lName = form.lastName.trim().toLowerCase()
@@ -84,6 +89,10 @@ export default function Signup() {
             setLoading(false)
             return
           }
+        } else if (idAnalysis && !idAnalysis.isValid) {
+           setError(`National ID Issue: ${idAnalysis.message}`)
+           setLoading(false)
+           return
         }
 
         // 2. Check CV Name Match (if CV exists)
