@@ -925,9 +925,11 @@ async function request<T>(
   options: RequestInit & { skipUnwrap?: boolean } = {}
 ): Promise<T> {
   const { skipUnwrap, ...init } = options;
-  // In development, we use relative paths for /api calls to let the Vite proxy (in vite.config.ts) handle it.
-  // This avoids CORS issues on the browser side.
-  const useProxy = import.meta.env.DEV && path.startsWith('/api');
+  // In development we normally use relative paths for /api calls so the Vite proxy handles them.
+  // However, if VITE_API_BASE_URL is explicitly provided, prefer calling the backend directly
+  // (useful when the dev server/proxy isn't forwarding or you want to hit a remote API).
+  const hasApiBase = Boolean(import.meta.env.VITE_API_BASE_URL);
+  const useProxy = import.meta.env.DEV && path.startsWith('/api') && !hasApiBase;
   const url = useProxy ? path : (API_BASE_URL ? `${API_BASE_URL.replace(/\/$/, '')}${path}` : path);
   const token = getToken();
   const headers: Record<string, string> = {};
@@ -965,6 +967,10 @@ async function request<T>(
   }
   
   const text = await res.text();
+  // Log raw response for easier debugging of 4xx/5xx errors
+  if (!res.ok) {
+    try { console.error('[API Error] URL:', url, 'Status:', res.status, 'Body:', text) } catch {}
+  }
   let json: (Types.ApiResponse<T> & { detail?: string }) | null = null;
   if (text) {
     try {
@@ -1581,7 +1587,8 @@ export const marketerApi = {
     return api.post<Types.PersonalityTestResultDto>(`/api/Marketer/my/personality-test`, data);
   },
   getmyprofile: () => {
-    return api.get<Types.MarketerProfileDto>(`/api/Marketer/my/profile`);
+    // Backend exposes this route as PUT (returns profile on PUT), so use PUT to avoid 405.
+    return api.put<Types.MarketerProfileDto>(`/api/Marketer/my/profile`, {});
   },
   putmyprofile: (data: Types.UpdateMarketerProfileDto) => {
     return api.put<Types.MarketerProfileDto>(`/api/Marketer/my/profile`, data);

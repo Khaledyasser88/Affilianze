@@ -83,18 +83,6 @@ export default function Signup() {
           }
 
           // Check if entered name is contained in or matches ID name
-          const idNameParts = detectedIdName.split(' ')
-          const fName = form.firstName.trim().toLowerCase()
-          const lName = form.lastName.trim().toLowerCase()
-
-          const hasFirstName = idNameParts.includes(fName)
-          const hasLastName = idNameParts.includes(lName)
-
-          if (!hasFirstName || !hasLastName) {
-            setError(`Name Mismatch! Your form name (${form.firstName} ${form.lastName}) must match the name on your ID: "${idAnalysis.name}"`)
-            setLoading(false)
-            return
-          }
         } else if (idAnalysis && !idAnalysis.isValid) {
            setError(`National ID Issue: ${idAnalysis.message}`)
            setLoading(false)

@@ -7,8 +7,11 @@ import {
 import { marketerApi, campaignApi } from '../../api/client'
 import { toast } from 'react-hot-toast'
 import { activityTracker } from '../../utils/activityTracker'
+import { useAuth } from '../../context/AuthContext'
+import type { CVGenerateRequest, CVGenerateResponse } from '../../utils/aiService'
+import { analyzeCVWithAI, downloadCVFromAI, generateCVWithAI, generateMarketingPosts, translatePostToArabic } from '../../utils/aiService'
 
-type TabKey = 'cv' | 'posts' | 'recommend'
+type TabKey = 'cv' | 'cvgen' | 'posts' | 'recommend'
 
 interface CvAnalysis {
   skills: string[]
@@ -26,9 +29,8 @@ interface GeneratedPost {
   copied: boolean
 }
 
-import { analyzeCVWithAI, generateMarketingPosts, translatePostToArabic } from '../../utils/aiService'
-
 export default function AiTools() {
+  const { name, email, phone } = useAuth()
   const [activeTab, setActiveTab] = useState<TabKey>('cv')
 
   // CV State
@@ -36,6 +38,31 @@ export default function AiTools() {
   const [cvAnalysis, setCvAnalysis] = useState<CvAnalysis | null>(null)
   const [cvLoading, setCvLoading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+
+  const [cvGeneratorLoading, setCvGeneratorLoading] = useState(false)
+  const [cvGeneratedText, setCvGeneratedText] = useState<string | null>(null)
+  const [cvGeneratedFileName, setCvGeneratedFileName] = useState<string | null>(null)
+  const [cvDownloading, setCvDownloading] = useState(false)
+  const [cvGeneratorForm, setCvGeneratorForm] = useState<CVGenerateRequest['personal']>({
+    name: name || '',
+    email: email || '',
+    phone: phone || '',
+    linkedin: '',
+    github: '',
+    location: '',
+    website: '',
+    summary: ''
+  })
+  const [cvGeneratorSkills, setCvGeneratorSkills] = useState('')
+
+  useEffect(() => {
+    setCvGeneratorForm((prev) => ({
+      ...prev,
+      name: name || prev.name,
+      email: email || prev.email,
+      phone: phone || prev.phone,
+    }))
+  }, [name, email, phone])
 
   // Post Generator State
   const [campaigns, setCampaigns] = useState<any[]>([])
@@ -80,6 +107,7 @@ export default function AiTools() {
 
   const tabs: { key: TabKey; label: string; icon: any; desc: string }[] = [
     { key: 'cv', label: 'CV Analyzer', icon: FileText, desc: 'Analyze your skills' },
+    { key: 'cvgen', label: 'CV Generator', icon: FileText, desc: 'Generate a polished resume' },
     { key: 'posts', label: 'Post Generator', icon: Wand2, desc: 'Create marketing content' },
     { key: 'recommend', label: 'Smart Match', icon: Target, desc: 'Find your best campaigns' },
   ]
@@ -176,6 +204,65 @@ export default function AiTools() {
       toast.error('Please upload a PDF, Word doc, or image file')
     }
   }, [])
+
+  const handleGenerateCv = async () => {
+    setCvGeneratorLoading(true)
+    setCvGeneratedText(null)
+    setCvGeneratedFileName(null)
+
+    try {
+      const request: CVGenerateRequest = {
+        personal: {
+          ...cvGeneratorForm,
+          linkedin: cvGeneratorForm.linkedin || undefined,
+          github: cvGeneratorForm.github || undefined,
+          location: cvGeneratorForm.location || undefined,
+          website: cvGeneratorForm.website || undefined,
+          summary: cvGeneratorForm.summary || undefined,
+        },
+        skills: {
+          technical: cvGeneratorSkills.split(',').map((skill) => skill.trim()).filter(Boolean)
+        }
+      }
+
+      const result = await generateCVWithAI(request)
+      const generatedFileName = result.download_filename || result.pdf_url?.split('/').pop() || 'generated-cv.pdf'
+      setCvGeneratedText(result.cv_text || 'CV generated successfully.')
+      setCvGeneratedFileName(generatedFileName)
+      toast.success('CV generated successfully!')
+    } catch (err: any) {
+      console.error('CV generator error:', err)
+      toast.error(err.message || 'Failed to generate CV.')
+    } finally {
+      setCvGeneratorLoading(false)
+    }
+  }
+
+  const handleDownloadCv = async () => {
+    if (!cvGeneratedFileName) {
+      toast.error('No CV file available to download.')
+      return
+    }
+
+    setCvDownloading(true)
+    try {
+      const blob = await downloadCVFromAI(cvGeneratedFileName)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = cvGeneratedFileName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      toast.success('CV download started')
+    } catch (err: any) {
+      console.error('CV download error:', err)
+      toast.error(err.message || 'Failed to download CV.')
+    } finally {
+      setCvDownloading(false)
+    }
+  }
 
   // ─── POST GENERATOR ────────────────────────────────────────
   const handleGeneratePosts = async () => {
@@ -480,6 +567,107 @@ export default function AiTools() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ═══ TAB 2: CV GENERATOR ═══ */}
+      {activeTab === 'cvgen' && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className={cardClass}>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-900 to-slate-600 rounded-2xl flex items-center justify-center shadow-lg shadow-slate-900/20">
+                <FileText className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-[18px] font-black text-slate-900">CV Generator</h3>
+                <p className="text-[13px] text-gray-400 font-medium">Generate a polished CV using AI based on your professional details.</p>
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              {[
+                { label: 'Full Name', value: cvGeneratorForm.name, key: 'name' },
+                { label: 'Email', value: cvGeneratorForm.email, key: 'email' },
+                { label: 'Phone', value: cvGeneratorForm.phone, key: 'phone' },
+                { label: 'Location', value: cvGeneratorForm.location, key: 'location' },
+                { label: 'LinkedIn', value: cvGeneratorForm.linkedin, key: 'linkedin' },
+                { label: 'GitHub', value: cvGeneratorForm.github, key: 'github' },
+                { label: 'Website', value: cvGeneratorForm.website, key: 'website' }
+              ].map((field) => (
+                <label key={field.key} className="space-y-2">
+                  <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{field.label}</span>
+                  <input
+                    type="text"
+                    value={field.value || ''}
+                    onChange={(e) => setCvGeneratorForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className="space-y-4 mt-6">
+              <label className="space-y-2">
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Professional Summary</span>
+                <textarea
+                  rows={4}
+                  value={cvGeneratorForm.summary || ''}
+                  onChange={(e) => setCvGeneratorForm((prev) => ({ ...prev, summary: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                  placeholder="Describe your experience, strengths, and career goals"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Key skills (comma-separated)</span>
+                <input
+                  type="text"
+                  value={cvGeneratorSkills}
+                  onChange={(e) => setCvGeneratorSkills(e.target.value)}
+                  className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                  placeholder="e.g. digital marketing, campaign strategy, influencer outreach"
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-8">
+              <button
+                onClick={handleGenerateCv}
+                disabled={cvGeneratorLoading}
+                className="inline-flex items-center justify-center rounded-2xl bg-[#1E3A8A] px-6 py-3 text-sm font-black text-white hover:bg-[#152C6E] transition-all disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {cvGeneratorLoading ? 'Generating CV…' : 'Generate CV'}
+              </button>
+              <p className="text-[12px] text-gray-400">The AI will use the details above to create a resume summary and structure.</p>
+            </div>
+
+            {cvGeneratedText && (
+              <div className="mt-8 p-6 bg-slate-50 border border-slate-100 rounded-3xl">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <h4 className="text-[15px] font-black text-slate-900">Generated CV Text</h4>
+                    <p className="text-[12px] text-gray-400">Copy it into your resume or download it as needed.</p>
+                  </div>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(cvGeneratedText)}
+                    className="text-[12px] font-black uppercase tracking-wider text-[#1E3A8A] hover:text-[#152C6E]"
+                  >
+                    Copy
+                  </button>
+                  {cvGeneratedFileName && (
+                    <button
+                      onClick={handleDownloadCv}
+                      disabled={cvDownloading}
+                      className="text-[12px] font-black uppercase tracking-wider text-[#0B6EFD] hover:text-[#084ECC]"
+                    >
+                      {cvDownloading ? 'Downloading…' : 'Download PDF'}
+                    </button>
+                  )}
+                </div>
+                <pre className="whitespace-pre-wrap text-[14px] text-slate-700 leading-7">{cvGeneratedText}</pre>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

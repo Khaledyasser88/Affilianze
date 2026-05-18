@@ -13,7 +13,7 @@ import * as Types from '../api/client'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { activityTracker } from '../utils/activityTracker'
-import { analyzeCVWithAI } from '../utils/aiService'
+import { analyzeCVWithAI, submitPersonalityTest } from '../utils/aiService'
 
 const countries = ['Egypt', 'Saudi Arabia', 'UAE', 'USA', 'UK', 'Germany', 'France']
 const timezones = ['Africa/Cairo (UTC+2)', 'Asia/Riyadh (UTC+3)', 'Europe/London (UTC+0)', 'America/New_York (UTC-5)']
@@ -113,7 +113,37 @@ export default function Settings() {
     { id: 7, text: "I prioritize long-term brand relationships over quick wins." },
     { id: 8, text: "I enjoy learning new marketing tools and platforms." },
     { id: 9, text: "I am confident in my ability to negotiate better deals." },
-    { id: 10, text: "I think visual aesthetics are the most important part of a campaign." }
+    { id: 10, text: "I think visual aesthetics are the most important part of a campaign." },
+    { id: 11, text: "I can adapt quickly when a campaign goal changes at the last minute." },
+    { id: 12, text: "I prefer to follow a proven marketing playbook rather than experimenting." },
+    { id: 13, text: "I enjoy mentoring others and sharing my marketing knowledge." },
+    { id: 14, text: "I find it easier to focus on tasks when I have a lot of structure." },
+    { id: 15, text: "I feel energized by brainstorming new campaign ideas." },
+    { id: 16, text: "I like to set ambitious goals and pursue them aggressively." },
+    { id: 17, text: "I pay close attention to how my target audience responds to content." },
+    { id: 18, text: "I prefer spending time on practical execution rather than planning." },
+    { id: 19, text: "I enjoy finding creative ways to solve marketing challenges." },
+    { id: 20, text: "I trust my intuition when choosing influencer partnerships." },
+    { id: 21, text: "I am comfortable navigating complex stakeholder requirements." },
+    { id: 22, text: "I prefer wide-reaching campaigns over highly targeted ones." },
+    { id: 23, text: "I am motivated by performance metrics and clear KPIs." },
+    { id: 24, text: "I prefer a relaxed work environment with less pressure." },
+    { id: 25, text: "I enjoy taking responsibility for difficult decisions." },
+    { id: 26, text: "I usually plan my week in advance and stick to it." },
+    { id: 27, text: "I am excited by campaigns that require inventing new formats." },
+    { id: 28, text: "I prefer consistent routines over sudden schedule changes." },
+    { id: 29, text: "I like to review campaign performance data thoroughly." },
+    { id: 30, text: "I often take the lead when coordinating with brands and partners." },
+    { id: 31, text: "I appreciate clear guidelines more than vague creative freedom." },
+    { id: 32, text: "I enjoy working with people who have different styles than mine." },
+    { id: 33, text: "I find it easy to stay calm under tight delivery deadlines." },
+    { id: 34, text: "I prefer following through on a few strong ideas instead of many small ones." },
+    { id: 35, text: "I enjoy collecting feedback to improve my campaigns." },
+    { id: 36, text: "I feel driven to achieve more than expected in every campaign." },
+    { id: 37, text: "I prefer trusting data over gut instinct when making decisions." },
+    { id: 38, text: "I am quick to start projects even if the plan is not perfect." },
+    { id: 39, text: "I enjoy collaborating with creative teams on campaign direction." },
+    { id: 40, text: "I am energized when I see a campaign deliver strong results." }
   ]
 
   useEffect(() => {
@@ -189,7 +219,13 @@ export default function Settings() {
               facebook: social.facebook ?? prev.facebook ?? ''
             }))
           }
-          const test = await marketerApi.getmypersonalitytest().catch(() => null)
+          const test = await marketerApi.getmypersonalitytest().catch((err: any) => {
+            if (typeof err?.message === 'string' && err.message.includes('Personality test not completed')) {
+              return null
+            }
+            console.error('Personality test fetch failed:', err)
+            return null
+          })
           if (test) setTestResult(test)
         } else if (role?.toLowerCase() === 'company') {
           const cProfile = await companyApi.getmyprofile().catch(() => null)
@@ -293,15 +329,16 @@ export default function Settings() {
   }
 
   const handleSubmitTest = async () => {
-    const answers: Types.PersonalityTestAnswerDto[] = Object.entries(testAnswers).map(([qid, val]) => ({ questionId: parseInt(qid), answer: val }))
-    if (answers.length < questions.length) { toast.error('Please answer all questions first'); return }
+    if (Object.keys(testAnswers).length < questions.length) { toast.error('Please answer all questions first'); return }
     setLoading(true)
     try {
-      const res = await marketerApi.postmypersonalitytest({ answers })
-      setTestResult(res); setIsTakingTest(false)
+      const res = await submitPersonalityTest(testAnswers)
+      setTestResult(res)
+      setIsTakingTest(false)
       toast.success('Test submitted successfully!')
-    } catch { toast.error('Failed to submit test') }
-    finally { setLoading(false) }
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to submit test')
+    } finally { setLoading(false) }
   }
 
   const handleSaveNotifications = async () => {

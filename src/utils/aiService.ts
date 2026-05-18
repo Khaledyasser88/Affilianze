@@ -6,6 +6,156 @@
 const GEMINI_MODEL = 'gemini-2.5-flash-lite'
 const GEMINI_KEY   = () => (import.meta as any).env.VITE_GEMINI_API_KEY as string
 const GROQ_KEY     = () => (import.meta as any).env.VITE_GROQ_API_KEY as string
+const HF_AI_BASE   = () => ((import.meta as any).env.VITE_HF_AI_BASE_URL as string) || 'https://swordha5-aiproject.hf.space'
+
+export interface PersonalityTestServiceResult {
+  personalityScore?: number
+  personalityType?: string | null
+  description?: string | null
+  testDate?: string
+}
+
+function booleanAnswerFromScale(value: number): boolean {
+  return value >= 4
+}
+
+function computePersonalityScoreFromResponse(data: any): number {
+  const numericValues: number[] = []
+  const dimensions = data?.dimensions || {}
+  const mapping = data?.big_five_mapping || {}
+
+  for (const value of Object.values(dimensions)) {
+    if (typeof value === 'number') numericValues.push(value)
+  }
+  for (const value of Object.values(mapping)) {
+    if (typeof value === 'number') numericValues.push(value)
+  }
+
+  if (numericValues.length === 0) return 85
+  return Math.round(numericValues.reduce((sum, n) => sum + n, 0) / numericValues.length)
+}
+
+export async function submitPersonalityTest(
+  answers: Record<number, number>
+): Promise<PersonalityTestServiceResult> {
+  const ordered = Object.keys(answers)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((questionId) => booleanAnswerFromScale(answers[questionId]))
+
+  if (ordered.length === 0) {
+    throw new Error('Please answer all personality questions before submitting.')
+  }
+
+  const res = await fetch(`${HF_AI_BASE()}/api/v1/personality/analyze-personality`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers: ordered })
+  })
+
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data?.detail || data?.message || 'Personality API failed')
+  }
+
+  return {
+    personalityType: data?.mbti_type || null,
+    personalityScore: computePersonalityScoreFromResponse(data),
+    description: data?.marketing_explanation || data?.personality_summary || (data?.marketing_categories ? data.marketing_categories.join(', ') : null),
+    testDate: new Date().toISOString()
+  }
+}
+
+export interface CVGenerateRequest {
+  personal: {
+    name: string
+    email: string
+    phone: string
+    linkedin?: string | null
+    github?: string | null
+    location?: string | null
+    website?: string | null
+    summary?: string | null
+  }
+  education?: Array<{
+    institution: string
+    degree?: string | null
+    field?: string | null
+    start_date?: string | null
+    end_date?: string | null
+    gpa?: string | null
+    achievements?: string[] | null
+  }> | null
+  experience?: Array<{
+    company: string
+    title?: string | null
+    start_date?: string | null
+    end_date?: string | null
+    location?: string | null
+    bullets?: string[] | null
+  }> | null
+  skills?: {
+    technical?: string[] | null
+    soft?: string[] | null
+    tools?: string[] | null
+  } | null
+  projects?: Array<{
+    name: string
+    description?: string | null
+    tech_stack?: string[] | null
+    url?: string | null
+    bullets?: string[] | null
+  }> | null
+  certifications?: Array<{
+    name: string
+    issuer?: string | null
+    date?: string | null
+    url?: string | null
+  }> | null
+  target_job_title?: string | null
+}
+
+export interface CVGenerateResponse {
+  cv_text: string
+  ats_score: number
+  ats_grade: string
+  ats_breakdown?: any | null
+  matched_keywords?: string[] | null
+  missing_keywords?: string[] | null
+  suggestions?: string[] | null
+  pdf_url?: string | null
+  download_filename?: string | null
+}
+
+export async function generateCVWithAI(request: CVGenerateRequest): Promise<CVGenerateResponse> {
+  const res = await fetch(`${HF_AI_BASE()}/api/v1/cv/generate-cv`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  })
+
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data?.detail || data?.message || 'CV generation failed')
+  }
+
+  return data
+}
+
+export async function downloadCVFromAI(filename: string): Promise<Blob> {
+  const res = await fetch(`${HF_AI_BASE()}/api/v1/cv/download-cv/${encodeURIComponent(filename)}`)
+  if (!res.ok) {
+    let message = 'CV download failed'
+    try {
+      const errorData = await res.json()
+      message = errorData?.detail || errorData?.message || message
+    } catch {
+      // ignore non-json error body
+    }
+    throw new Error(message)
+  }
+  return await res.blob()
+}
 
 // ─── Core AI Calls with Fallback ──────────────────────────────────────────────
 
@@ -236,37 +386,43 @@ export interface IDVerificationResult {
 }
 
 export async function verifyNationalIDWithAI(file: File): Promise<IDVerificationResult> {
-  const base64   = await fileToBase64(file)
-  const mimeType = file.type || 'image/jpeg'
+  const buildForm = () => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return formData
+  }
 
-  const prompt = `
-You are a document verification specialist.
-Analyze this ID document image and extract the following information. 
-Respond ONLY in JSON format (no markdown):
+  const localUrl = '/api/v1/id/verify-id'
+  const externalUrl = `${HF_AI_BASE()}/api/v1/id/verify-id`
 
-{
-  "isValid": true or false (is this a legitimate government-issued ID card or passport?),
-  "name": "Full name visible on the ID, or 'not readable' if unclear",
-  "idNumber": "The unique ID number/National ID, or null if not readable",
-  "address": "The address visible on the ID, or null if not readable",
-  "message": "A friendly 1-2 sentence message. If valid: confirm it looks like a valid ID. If invalid: explain the issue (blurry, not an ID, expired, etc.)"
-}
-
-Be professional and privacy-conscious.
-  `.trim()
-
-  const raw = await callAIWithFile(base64, mimeType, prompt)
-
+  let res: Response
   try {
-    const clean = raw.replace(/```json|```/g, '').trim()
-    const jsonMatch = clean.match(/\{[\s\S]*\}/)
-    return JSON.parse(jsonMatch ? jsonMatch[0] : clean)
-  } catch {
-    return {
-      isValid: false,
-      name: 'Not readable',
-      message: 'Could not process the document. Please upload a clear image of your National ID.'
+    res = await fetch(localUrl, { method: 'POST', body: buildForm() })
+    if (!res.ok && res.status === 404) {
+      throw new Error('Local API route not found')
     }
+  } catch (localErr) {
+    try {
+      res = await fetch(externalUrl, { method: 'POST', body: buildForm() })
+    } catch (externalErr) {
+      throw new Error('ID verification service unavailable. Please check the backend or internet connection.')
+    }
+  }
+
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data?.detail || data?.message || 'ID verification failed')
+  }
+
+  const idData = data?.data || {}
+  const fullName = idData?.full_name || idData?.first_name ? `${idData.first_name || ''} ${idData.last_name || ''}`.trim() : 'Not readable'
+
+  return {
+    isValid: data?.verified ?? false,
+    name: fullName || 'Not readable',
+    idNumber: idData?.national_id || undefined,
+    address: idData?.address || undefined,
+    message: data?.message || (data?.verified ? 'ID verified successfully.' : 'ID could not be verified. Please provide a clear image.')
   }
 }
 
