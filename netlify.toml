@@ -3,6 +3,12 @@
   publish = "dist"
 
 [[redirects]]
+  from = "/backend-api/*"
+  to = "http://affilliance.runasp.net/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/*"
   to = "http://affilliance.runasp.net/api/:splat"
   status = 200
