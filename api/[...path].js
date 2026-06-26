@@ -8,30 +8,12 @@ export const config = {
 };
 
 export default function handler(req, res) {
-  let targetPath = req.url;
-  
-  if (req.query && req.query.target) {
-    const queryParts = [];
-    for (const key in req.query) {
-      if (key !== 'target') {
-        const val = req.query[key];
-        if (Array.isArray(val)) {
-          val.forEach(v => queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`));
-        } else {
-          queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
-        }
-      }
-    }
-    const qs = queryParts.join('&');
-    targetPath = qs ? `${req.query.target}?${qs}` : req.query.target;
-  }
-
   const targetHost = 'affilliance.runasp.net';
   
   const options = {
     hostname: targetHost,
     port: 80,
-    path: targetPath,
+    path: req.url, // e.g. /api/auth/login
     method: req.method,
     headers: { ...req.headers },
   };
