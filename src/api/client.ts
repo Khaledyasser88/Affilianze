@@ -900,7 +900,7 @@ export type WithdrawalStatus = 'Pending' | 'Approved' | 'Rejected' | 'Processing
 
 }
 
-export const API_BASE_URL = import.meta.env.PROD ? '' : ((import.meta.env.VITE_API_BASE_URL as string) || '');
+export const API_BASE_URL = import.meta.env.PROD ? '/backend-api' : ((import.meta.env.VITE_API_BASE_URL as string) || '');
 
 export function resolveImageUrl(url: string | null | undefined): string | null {
   if (!url) return null

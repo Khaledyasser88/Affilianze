@@ -10,10 +10,38 @@ export const config = {
 export default function handler(req, res) {
   const targetHost = 'affilliance.runasp.net';
   
+  let targetPath = req.query.path || '';
+  if (Array.isArray(targetPath)) {
+    targetPath = targetPath.join('/');
+  }
+  
+  if (req.query.prefix) {
+    targetPath = `/${req.query.prefix}/${targetPath}`;
+  } else {
+    targetPath = `/${targetPath}`;
+  }
+  
+  // Reconstruct query parameters (excluding 'path' and 'prefix')
+  const queryParts = [];
+  for (const key in req.query) {
+    if (key !== 'path' && key !== 'prefix') {
+      const val = req.query[key];
+      if (Array.isArray(val)) {
+        val.forEach(v => queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`));
+      } else {
+        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
+      }
+    }
+  }
+  
+  if (queryParts.length > 0) {
+    targetPath += `?${queryParts.join('&')}`;
+  }
+  
   const options = {
     hostname: targetHost,
     port: 80,
-    path: req.url, // e.g. /api/auth/login
+    path: targetPath,
     method: req.method,
     headers: { ...req.headers },
   };
