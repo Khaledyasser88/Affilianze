@@ -7,7 +7,13 @@ const GEMINI_MODEL = 'gemini-2.5-flash-lite'
 const GEMINI_KEY   = () => (import.meta as any).env.VITE_GEMINI_API_KEY as string
 const GROQ_KEY     = () => (import.meta as any).env.VITE_GROQ_API_KEY as string
 const HF_AI_BASE   = () => ((import.meta as any).env.VITE_HF_AI_BASE_URL as string) || 'https://swordha5-aiproject.hf.space'
-const HF_CV_ANALYSIS_BASE = () => ((import.meta as any).env.VITE_HF_CV_ANALYSIS_URL as string) || 'https://swordha-cvanalysis.hf.space'
+// In dev, route through the Vite proxy (/cv-api) to avoid CORS.
+// In production, call the HF Space directly (backend must have CORS enabled).
+const HF_CV_ANALYSIS_BASE = () => {
+  const isDev = (import.meta as any).env.DEV
+  if (isDev) return '' // use /cv-api proxy path (no base needed)
+  return ((import.meta as any).env.VITE_HF_CV_ANALYSIS_URL as string) || 'https://swordha-cvanalysis.hf.space'
+}
 
 export interface PersonalityTestServiceResult {
   personalityScore?: number
@@ -231,15 +237,16 @@ export interface CVAnalysisResult {
 }
 
 export async function analyzeCVWithAI(file: File): Promise<CVAnalysisResult> {
+  // ── Try HF Space (via Vite proxy in dev, direct in prod) ──────────────────
+  const base = HF_CV_ANALYSIS_BASE()
+  const proxyPath = (import.meta as any).env.DEV ? '/cv-api' : ''
+  const url = `${base}${proxyPath}/v1/cv/analyze?_t=${Date.now()}`
+
   try {
-    // Use HF CV Analysis endpoint with multipart form data
     const formData = new FormData()
     formData.append('file', file)
 
-    const res = await fetch(`${HF_CV_ANALYSIS_BASE()}/api/analyze-cv`, {
-      method: 'POST',
-      body: formData
-    })
+    const res = await fetch(url, { method: 'POST', body: formData, cache: 'no-store' })
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}))
@@ -247,29 +254,36 @@ export async function analyzeCVWithAI(file: File): Promise<CVAnalysisResult> {
     }
 
     const data = await res.json()
-
-    // Map HF API response to CVAnalysisResult
-    return {
-      fullName: data.fullName || data.full_name || '',
-      bio: data.bio || data.professional_summary || 'Professional marketer',
-      niche: data.niche || data.marketing_niches || 'Digital Marketing',
-      skills: data.skills || 'Marketing',
-      experienceLevel: data.experienceLevel || data.experience_level || 'Mid-Level',
-      summary: data.summary || 'Ready for affiliate campaigns'
-    }
-  } catch (err: any) {
-    console.error('CV Analysis error:', err)
-    // Fallback if analysis fails
-    return {
-      fullName: '',
-      bio: 'A passionate digital marketer with experience in content creation and audience growth.',
-      niche: 'Digital Marketing, Social Media, E-commerce',
-      skills: 'Content Creation, SEO, Social Media Marketing, Analytics, Copywriting',
-      experienceLevel: 'Mid-Level',
-      summary: 'A versatile marketer well-suited for affiliate campaigns.'
-    }
+    return parseCVAnalysisResponse(data)
+  } catch (hfErr: any) {
+    console.error('CV Analysis API failed:', hfErr.message)
+    throw new Error('CV analysis service is currently unavailable. Please try again later.')
   }
 }
+
+/** Parse the structured response from the HF CV Analysis Space */
+function parseCVAnalysisResponse(data: any): CVAnalysisResult {
+  const profile = data.candidate_profile || {}
+  const niches = (data.affiliate_niches || []).map((n: any) => n.niche)
+  const skillsList = Array.from(new Set([...(data.verified_skills || []), ...(data.digital_skills || [])]))
+
+  const seniorityPart = profile.seniority ? `${profile.seniority}-level professional` : 'professional'
+  const nichePart = niches.length > 0 ? ` specializing in ${niches.slice(0, 3).join(', ')}` : ''
+  const skillsPart = skillsList.length > 0 ? `. Experienced in ${skillsList.slice(0, 5).join(', ')}` : ''
+  const bio = `A results-driven ${seniorityPart}${nichePart}${skillsPart}.`
+
+  return {
+    fullName: data.fullName || data.full_name || '',
+    bio,
+    niche: niches.join(', ') || 'Digital Marketing',
+    skills: (skillsList as string[]).join(', ') || 'Marketing',
+    experienceLevel: profile.seniority || 'Mid-Level',
+    summary: data.strengths?.[0] || `Marketer with ${profile.years_experience || 0} years of experience.`
+  }
+}
+
+
+
 
 // ─── National ID Verification ─────────────────────────────────────────────────
 

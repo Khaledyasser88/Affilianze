@@ -976,7 +976,16 @@ async function request<T>(
     try {
       json = JSON.parse(text) as Types.ApiResponse<T> & { detail?: string };
     } catch {
-      if (!res.ok) throw new Error(text || res.statusText);
+      if (!res.ok) {
+        // Sanitize raw server/CDN error text (e.g. Netlify NOT_FOUND, HTML pages)
+        const isNotFound = res.status === 404 || text.toLowerCase().includes('not_found') || text.toLowerCase().includes('not found') || text.toLowerCase().includes('page could not be found');
+        if (isNotFound) {
+          throw new Error(`404: The requested endpoint was not found. The backend may be unavailable.`);
+        }
+        // Truncate long raw responses (HTML pages, etc.) to avoid exposing noise
+        const sanitized = text.length > 120 ? text.slice(0, 120) + '…' : text;
+        throw new Error(sanitized || res.statusText);
+      }
       return undefined as T;
     }
   }
@@ -991,6 +1000,10 @@ async function request<T>(
       if (details) throw new Error(details);
     }
     const msg = err?.message ?? err?.detail ?? err?.title ?? res.statusText;
+    // Sanitize 404 responses
+    if (res.status === 404) {
+      throw new Error(`404: Service endpoint not found. The backend may be unavailable.`);
+    }
     throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
   }
   

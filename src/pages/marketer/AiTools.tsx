@@ -149,9 +149,11 @@ export default function AiTools() {
 
   // ─── CV ANALYSIS (uses Gemini multimodal - sends PDF directly) ────
   const handleCvUpload = async (file: File) => {
-    setCvFile(file)
-    setCvLoading(true)
+    // Clear everything first so stale results never show
+    setCvFile(null)
     setCvAnalysis(null)
+    setCvLoading(true)
+    setCvFile(file)
     
     try {
       // Upload CV to backend silently
@@ -188,7 +190,7 @@ export default function AiTools() {
       toast.success('CV analyzed successfully!')
     } catch (err: any) {
       console.error('CV Analysis error:', err)
-      toast.error(err.message || 'Failed to analyze CV. Check your Gemini API key.')
+      toast.error(err.message || 'Failed to analyze CV. Please try again.')
     } finally {
       setCvLoading(false)
     }
@@ -456,7 +458,10 @@ export default function AiTools() {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0]
-                      if (file) handleCvUpload(file)
+                      if (!file) return
+                      // Reset so same file can be selected again and onChange fires
+                      e.target.value = ''
+                      handleCvUpload(file)
                     }}
                   />
                 </label>

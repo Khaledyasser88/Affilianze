@@ -7,7 +7,6 @@ import {
   XCircle, 
   Clock, 
   ChevronLeft, 
-  ExternalLink,
   MessageSquare,
   FileText,
   History,
@@ -16,7 +15,8 @@ import {
   AlertCircle,
   MousePointer2,
   Calendar,
-  TrendingUp
+  TrendingUp,
+  Download
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { activityTracker } from '../../utils/activityTracker'
@@ -34,6 +34,86 @@ export default function CompanyApplications() {
   // Complaint Modal states
   const [reportModalOpen, setReportModalOpen] = useState(false)
   const [selectedMarketer, setSelectedMarketer] = useState<{id: number, name: string} | null>(null)
+  
+  // Application expansion states & storage details
+  const [expandedAppId, setExpandedAppId] = useState<number | null>(null)
+  const [analysisResults, setAnalysisResults] = useState<Record<number, any>>({})
+  const [analyzingIds, setAnalyzingIds] = useState<Record<number, boolean>>({})
+
+  const analyzeCV = async (appId: number, details: any) => {
+    setAnalyzingIds(prev => ({ ...prev, [appId]: true }));
+    try {
+      let file: File;
+      if (details.cvFileBase64 && details.cvFileBase64 !== 'mock_base64_data') {
+        const res = await fetch(details.cvFileBase64);
+        const blob = await res.blob();
+        file = new File([blob], details.cvFileName || 'cv.pdf', { type: blob.type });
+      } else {
+        const content = `CV/Resume of ${details.phoneNumber}\n\nPitch: ${details.pitch}\nExperience Level: ${details.experienceLevel} (${details.yearsExperience} years)\nPortfolio: ${details.portfolioUrl}\nSocial: ${details.socialLink}`;
+        const blob = new Blob([content], { type: 'text/plain' });
+        file = new File([blob], 'resume.txt', { type: 'text/plain' });
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('https://swordha-cvanalysis.hf.space/v1/cv/analyze?language=en', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to analyze CV');
+      }
+
+      const data = await response.json();
+      setAnalysisResults(prev => ({ ...prev, [appId]: data }));
+      toast.success('AI CV Analysis Complete');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to analyze CV');
+    } finally {
+      setAnalyzingIds(prev => ({ ...prev, [appId]: false }));
+    }
+  };
+
+  const getAppDetails = (app: any) => {
+    const local = localStorage.getItem(`affilianze_app_details_${app.id}`)
+    if (local) return JSON.parse(local)
+    
+    // Fallback details for seeded/database apps during mockup demo
+    return {
+      pitch: `I am an experienced affiliate marketer. I've promoted campaigns in this niche before and have built an engaged following. I plan to feature your campaign heavily in weekly reels, story swipe-ups, and a detailed blog review.`,
+      experienceLevel: app.marketerPerformanceScore && app.marketerPerformanceScore > 80 ? 'Senior' : 'Mid',
+      yearsExperience: app.marketerPerformanceScore && app.marketerPerformanceScore > 80 ? '4' : '2',
+      channels: ['instagram', 'tiktok', 'facebook'],
+      audienceSize: '10K – 50K',
+      audienceLocation: 'Egypt',
+      portfolioUrl: 'https://behance.net/marketer_portfolio',
+      socialLink: 'https://instagram.com/marketer_profile',
+      availableFrom: new Date().toISOString().split('T')[0],
+      phoneNumber: '+20 100 456 7890',
+      cvFileName: `${app.marketerName || 'Marketer'}_Resume.pdf`,
+      cvFileBase64: 'mock_base64_data',
+    }
+  }
+
+  const handleDownloadCV = (details: any) => {
+    if (details.cvFileBase64 && details.cvFileBase64 !== 'mock_base64_data') {
+      const link = document.createElement('a')
+      link.href = details.cvFileBase64
+      link.download = details.cvFileName || 'CV.pdf'
+      link.click()
+    } else {
+      const blob = new Blob([`CV/Resume of ${details.phoneNumber}\n\nPitch: ${details.pitch}\nExperience Level: ${details.experienceLevel} (${details.yearsExperience} years)\nPortfolio: ${details.portfolioUrl}\nSocial: ${details.socialLink}`], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = details.cvFileName ? details.cvFileName.replace(/\.pdf$/, '.txt') : 'Resume.txt'
+      link.click()
+      URL.revokeObjectURL(url)
+    }
+  }
 
   useEffect(() => {
     loadApplications()
@@ -218,63 +298,254 @@ export default function CompanyApplications() {
                 <button className="text-[11px] font-black text-[#1E3A8A] uppercase tracking-widest hover:underline">Batch Actions</button>
              </div>
             {applications.map((app) => (
-              <div key={app.id} className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm flex flex-wrap items-center justify-between gap-8 group hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-500 relative overflow-hidden">
+              <div key={app.id} className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm flex flex-col items-stretch group hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-500 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1.5 h-full bg-[#1E3A8A] opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 
-                <div className="flex items-center gap-8">
-                  <div className="w-20 h-20 rounded-[28px] bg-slate-50 flex items-center justify-center text-[#1E3A8A] relative border border-slate-100 p-1 group-hover:scale-105 transition-transform duration-500">
-                    <img src={defaultProfileImg} className="w-full h-full object-cover rounded-[24px]" alt="Profile" />
-                    <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-white rounded-full flex items-center justify-center border border-slate-100 shadow-md">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <div className="flex flex-wrap items-center justify-between gap-8 w-full">
+                  <div className="flex items-center gap-8">
+                    <div className="w-20 h-20 rounded-[28px] bg-slate-50 flex items-center justify-center text-[#1E3A8A] relative border border-slate-100 p-1 group-hover:scale-105 transition-transform duration-500">
+                      <img src={defaultProfileImg} className="w-full h-full object-cover rounded-[24px]" alt="Profile" />
+                      <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-white rounded-full flex items-center justify-center border border-slate-100 shadow-md">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-4 mb-2">
+                        <h3 className="text-[20px] font-black text-slate-900 group-hover:text-[#1E3A8A] transition-colors">{app.marketerName || 'Anonymous Marketer'}</h3>
+                        {getStatusBadge(app.status)}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+                        <span className="text-[13px] font-bold text-slate-400 flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-slate-300" /> Joined {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : 'N/A'}
+                        </span>
+                        <button 
+                          onClick={() => openReportModal(app.marketerId!, app.marketerName || 'Marketer')}
+                          className="text-[12px] font-black text-rose-500 flex items-center gap-2 hover:bg-rose-50 px-2.5 py-1 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+                        >
+                          <AlertCircle className="w-4 h-4" /> Report
+                        </button>
+                        <button 
+                          onClick={() => setExpandedAppId(expandedAppId === app.id ? null : app.id!)}
+                          className="text-[12px] font-black text-[#1E3A8A] flex items-center gap-2 hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                        >
+                          <FileText className="w-4 h-4" /> {expandedAppId === app.id ? 'Hide Details' : 'View Application'}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-4 mb-2">
-                      <h3 className="text-[20px] font-black text-slate-900 group-hover:text-[#1E3A8A] transition-colors">{app.marketerName || 'Anonymous Marketer'}</h3>
-                      {getStatusBadge(app.status)}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-                      <span className="text-[13px] font-bold text-slate-400 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-slate-300" /> Joined {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : 'N/A'}
-                      </span>
-                      <button 
-                        onClick={() => openReportModal(app.marketerId!, app.marketerName || 'Marketer')}
-                        className="text-[12px] font-black text-rose-500 flex items-center gap-2 hover:bg-rose-50 px-2.5 py-1 rounded-lg transition-colors border border-transparent hover:border-rose-100"
-                      >
-                        <AlertCircle className="w-4 h-4" /> Report
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto mt-6 lg:mt-0">
+                    {app.status === 'Pending' ? (
+                      <>
+                        <button 
+                          onClick={() => handleAction(app.id!, 'reject')}
+                          disabled={actionLoading === app.id}
+                          className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white border border-slate-100 text-slate-400 text-[13px] font-black hover:text-rose-600 hover:border-rose-100 hover:bg-rose-50 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                        <button 
+                          onClick={() => handleAction(app.id!, 'approve')}
+                          disabled={actionLoading === app.id}
+                          className="w-full sm:w-auto justify-center px-10 py-4 rounded-2xl bg-[#1E3A8A] text-white text-[13px] font-black shadow-xl shadow-blue-900/20 hover:bg-[#152C6E] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2.5 disabled:opacity-50"
+                        >
+                          {actionLoading === app.id && <Clock className="w-4 h-4 animate-spin text-white/50" />}
+                          Approve Candidate
+                        </button>
+                      </>
+                    ) : (
+                      <button className="w-full lg:w-auto group/btn justify-center flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-slate-50 text-slate-400 text-[13px] font-black hover:bg-white hover:border-slate-200 border border-transparent transition-all">
+                        <MessageSquare className="w-4 h-4 group-hover/btn:text-[#1E3A8A] transition-colors" /> Message Marketer
                       </button>
-                      <button className="text-[12px] font-black text-[#1E3A8A] flex items-center gap-2 hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-colors border border-transparent hover:border-blue-100">
-                        <ExternalLink className="w-4 h-4" /> Audit Profile
-                      </button>
-                    </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto mt-6 lg:mt-0">
-                  {app.status === 'Pending' ? (
-                    <>
-                      <button 
-                        onClick={() => handleAction(app.id!, 'reject')}
-                        disabled={actionLoading === app.id}
-                        className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white border border-slate-100 text-slate-400 text-[13px] font-black hover:text-rose-600 hover:border-rose-100 hover:bg-rose-50 transition-all active:scale-95 disabled:opacity-50"
-                      >
-                        Reject
-                      </button>
-                      <button 
-                        onClick={() => handleAction(app.id!, 'approve')}
-                        disabled={actionLoading === app.id}
-                        className="w-full sm:w-auto justify-center px-10 py-4 rounded-2xl bg-[#1E3A8A] text-white text-[13px] font-black shadow-xl shadow-blue-900/20 hover:bg-[#152C6E] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2.5 disabled:opacity-50"
-                      >
-                        {actionLoading === app.id && <Clock className="w-4 h-4 animate-spin text-white/50" />}
-                        Approve Candidate
-                      </button>
-                    </>
-                  ) : (
-                    <button className="w-full lg:w-auto group/btn justify-center flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-slate-50 text-slate-400 text-[13px] font-black hover:bg-white hover:border-slate-200 border border-transparent transition-all">
-                      <MessageSquare className="w-4 h-4 group-hover/btn:text-[#1E3A8A] transition-colors" /> Message Marketer
-                    </button>
-                  )}
-                </div>
+                {expandedAppId === app.id && (() => {
+                  const details = getAppDetails(app);
+                  return (
+                    <div className="border-t border-slate-100 mt-6 pt-6 w-full animate-in fade-in slide-in-from-top-4 duration-300 space-y-6">
+                      <div className="grid md:grid-cols-2 gap-8 text-left">
+                        {/* Column 1: Pitch & Experience */}
+                        <div className="space-y-4">
+                          <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Marketer Pitch</h4>
+                          <p className="text-[14px] text-slate-600 font-medium leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-100/50 whitespace-pre-wrap">
+                            {details.pitch}
+                          </p>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100/50">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Experience</p>
+                              <p className="text-[13px] font-black text-slate-800">{details.experienceLevel} Level ({details.yearsExperience} yrs)</p>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100/50">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Available From</p>
+                              <p className="text-[13px] font-black text-slate-800">{details.availableFrom}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Column 2: Promotion Details, Socials & CV */}
+                        <div className="space-y-4">
+                          <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Promotion Details</h4>
+                          
+                          <div className="space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-100/50">
+                            <div>
+                              <p className="text-[11px] text-slate-400 font-bold mb-2">Target Channels</p>
+                              <div className="flex flex-wrap gap-2">
+                                {details.channels && details.channels.map((c: string) => (
+                                  <span key={c} className="px-2.5 py-1 bg-[#1E3A8A]/5 text-[#1E3A8A] text-[10px] font-black rounded-lg border border-[#1E3A8A]/10 uppercase tracking-wide">
+                                    {c}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 pt-2">
+                              <div>
+                                <p className="text-[11px] text-slate-400 font-bold mb-1">Audience Size</p>
+                                <p className="text-[13px] font-black text-slate-800">{details.audienceSize}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] text-slate-400 font-bold mb-1">Target Location</p>
+                                <p className="text-[13px] font-black text-slate-800">{details.audienceLocation || 'N/A'}</p>
+                              </div>
+                            </div>
+
+                            <div className="border-t border-slate-200/60 pt-4 mt-4 space-y-2">
+                              <div className="flex items-center gap-2 text-[13px] font-bold text-slate-700">
+                                <span className="text-slate-400">📞 Phone:</span>
+                                <a href={`tel:${details.phoneNumber}`} className="hover:underline text-[#1E3A8A]">{details.phoneNumber}</a>
+                              </div>
+                              {details.portfolioUrl && (
+                                <div className="flex items-center gap-2 text-[13px] font-bold text-slate-700">
+                                  <span className="text-slate-400">🔗 Portfolio:</span>
+                                  <a href={details.portfolioUrl} target="_blank" rel="noreferrer" className="hover:underline text-[#1E3A8A] truncate max-w-[200px]">{details.portfolioUrl}</a>
+                                </div>
+                              )}
+                              {details.socialLink && (
+                                <div className="flex items-center gap-2 text-[13px] font-bold text-slate-700">
+                                  <span className="text-slate-400">📱 Social:</span>
+                                  <a href={details.socialLink} target="_blank" rel="noreferrer" className="hover:underline text-[#1E3A8A] truncate max-w-[200px]">{details.socialLink}</a>
+                                </div>
+                              )}
+                              
+                              <div className="pt-3 flex flex-col gap-2">
+                                <button 
+                                  onClick={() => handleDownloadCV(details)}
+                                  className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-black text-[12px] rounded-xl border border-amber-100/50 transition-all active:scale-95 w-full justify-center"
+                                >
+                                  <Download className="w-4 h-4" /> Download Marketer CV ({details.cvFileName || 'Resume.pdf'})
+                                </button>
+                                <button 
+                                  onClick={() => analyzeCV(app.id!, details)}
+                                  disabled={analyzingIds[app.id!]}
+                                  className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-[12px] rounded-xl border border-indigo-100/50 transition-all active:scale-95 w-full justify-center disabled:opacity-50"
+                                >
+                                  {analyzingIds[app.id!] ? <Clock className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />} 
+                                  {analyzingIds[app.id!] ? 'Analyzing with AI...' : 'Analyze CV with AI'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* AI Analysis Results */}
+                        {analysisResults[app.id!] && (
+                          <div className="md:col-span-2 bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-2xl border border-indigo-100/50 mt-4 shadow-sm relative overflow-hidden animate-in fade-in slide-in-from-top-4">
+                            <div className="absolute -top-10 -right-10 p-4 opacity-10">
+                               <CheckCircle2 className="w-48 h-48" />
+                            </div>
+                            <div className="relative z-10">
+                              <h4 className="text-[14px] font-black text-indigo-900 uppercase tracking-widest flex items-center gap-2 mb-4">
+                                🤖 AI Analysis Results 
+                                <span className="text-[10px] bg-white px-2 py-1 rounded-full border border-indigo-100 text-indigo-600">
+                                  Confidence: {analysisResults[app.id!].confidence_score}%
+                                </span>
+                              </h4>
+                              
+                              <div className="grid md:grid-cols-3 gap-6">
+                                {/* Strengths & Weaknesses */}
+                                <div className="space-y-4">
+                                  <div>
+                                    <h5 className="text-[11px] font-black text-emerald-700 uppercase tracking-widest mb-2 flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3"/> Strengths</h5>
+                                    <ul className="space-y-1">
+                                      {analysisResults[app.id!].strengths?.map((s: string, i: number) => (
+                                        <li key={i} className="text-[12px] text-slate-700 font-medium flex items-start gap-1.5">
+                                          <span className="text-emerald-500 mt-0.5">•</span> {s}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                  {analysisResults[app.id!].weaknesses?.length > 0 && (
+                                    <div>
+                                      <h5 className="text-[11px] font-black text-rose-700 uppercase tracking-widest mb-2 flex items-center gap-1.5"><XCircle className="w-3 h-3"/> Areas to Improve</h5>
+                                      <ul className="space-y-1">
+                                        {analysisResults[app.id!].weaknesses?.map((w: string, i: number) => (
+                                          <li key={i} className="text-[12px] text-slate-700 font-medium flex items-start gap-1.5">
+                                            <span className="text-rose-500 mt-0.5">•</span> {w}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {/* Skills */}
+                                <div>
+                                  <h5 className="text-[11px] font-black text-indigo-700 uppercase tracking-widest mb-2">Verified Skills</h5>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {analysisResults[app.id!].verified_skills?.map((skill: string, i: number) => (
+                                      <span key={i} className="px-2 py-1 bg-white text-indigo-700 text-[10px] font-black rounded-lg border border-indigo-100/50">
+                                        {skill}
+                                      </span>
+                                    ))}
+                                    {analysisResults[app.id!].digital_skills?.map((skill: string, i: number) => (
+                                      <span key={`digital-${i}`} className="px-2 py-1 bg-blue-50 text-blue-700 text-[10px] font-black rounded-lg border border-blue-100/50">
+                                        {skill}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  
+                                  {analysisResults[app.id!].explicitly_missing_skills?.length > 0 && (
+                                    <div className="mt-4">
+                                      <h5 className="text-[11px] font-black text-amber-700 uppercase tracking-widest mb-2">Missing Skills</h5>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {analysisResults[app.id!].explicitly_missing_skills.map((skill: string, i: number) => (
+                                          <span key={i} className="px-2 py-1 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-lg border border-amber-100/50">
+                                            {skill}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Affiliate Niches */}
+                                {analysisResults[app.id!].affiliate_niches?.length > 0 && (
+                                  <div>
+                                    <h5 className="text-[11px] font-black text-purple-700 uppercase tracking-widest mb-2">Affiliate Niches</h5>
+                                    <div className="space-y-2">
+                                      {analysisResults[app.id!].affiliate_niches.map((niche: any, i: number) => (
+                                        <div key={i} className="bg-white p-2.5 rounded-xl border border-purple-100/50">
+                                          <div className="flex justify-between items-center mb-1">
+                                            <span className="text-[12px] font-black text-slate-800">{niche.niche}</span>
+                                            <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">{niche.score}%</span>
+                                          </div>
+                                          <p className="text-[10px] text-slate-500 line-clamp-2">{niche.evidence}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>

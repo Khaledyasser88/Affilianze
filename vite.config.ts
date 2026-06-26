@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => {
   // otherwise fall back to VITE_API_BASE_URL or localhost.
   const apiTarget = env.VITE_PROXY_TARGET || env.VITE_API_BASE_URL || 'http://localhost:5000'
 
+  const cvAnalysisTarget = env.VITE_HF_CV_ANALYSIS_URL || 'https://swordha-cvanalysis.hf.space'
+
   return {
     plugins: [react()],
     server: {
@@ -14,6 +16,12 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: apiTarget,
           changeOrigin: true,
+        },
+        // Proxy for HF CV Analysis Space — avoids CORS in dev
+        '/cv-api': {
+          target: cvAnalysisTarget,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/cv-api/, ''),
         },
       },
     },

@@ -4,6 +4,8 @@ import type { CampaignDto, CategoryDto, CommissionType } from '../api/client'
 import { Search, MapPin, Users, Star, Sparkles, Grid3X3, ChevronRight, ShoppingBag, Gamepad2, Home as HomeIcon, Film, UtensilsCrossed, Plane, ArrowDown, ShieldAlert } from 'lucide-react'
 import { activityTracker } from '../utils/activityTracker'
 import { toast } from 'react-hot-toast'
+import ApplyModal from '../components/ApplyModal'
+import type { ApplyFormData } from '../components/ApplyModal'
 
 const categoryIcons: Record<string, typeof ShoppingBag> = {
   'Fashion & Style': ShoppingBag,
@@ -212,6 +214,7 @@ export default function FindCampaigns() {
   const [loadingCampaignId, setLoadingCampaignId] = useState<number | null>(null)
   const [restrictedAlert, setRestrictedAlert] = useState<{isOpen: boolean, campaignName: string, campaignId?: number}>({isOpen: false, campaignName: ''})
   const [isSubmittingSupport, setIsSubmittingSupport] = useState(false)
+  const [applyModalCampaign, setApplyModalCampaign] = useState<CampaignDto | null>(null)
 
   const saveApplicationMap = (map: Record<number, { id: number, status: string }>) => {
     localStorage.setItem('affiliance_application_map', JSON.stringify(map))
@@ -257,7 +260,9 @@ export default function FindCampaigns() {
         return !title.includes('test') && !title.includes('loai') && title !== 'string'
       }
       
-      const searchData = (searchRes as any)?.items || (searchRes as any)?.data?.items || (searchRes as any)?.data || []
+      const rawData = (searchRes as any)
+      const searchData = rawData?.items || rawData?.data?.items || rawData?.data?.data || rawData?.data || []
+      const totalPages = rawData?.data?.totalPages || rawData?.totalPages || 1
       const filtered = Array.isArray(searchData) ? searchData.filter(isReal) : []
       
       if (isNextPage) {
@@ -268,7 +273,7 @@ export default function FindCampaigns() {
         setPage(1)
       }
 
-      setHasMore(filtered.length === pageSize)
+      setHasMore(currentPage < totalPages)
       
       // Zip Recommended Campaigns with AI Meta (Score & Reason)
       if (recCampaignsRes && !isNextPage) {
@@ -329,55 +334,75 @@ export default function FindCampaigns() {
     return () => clearTimeout(timer)
   }, [search, selectedCategory, showRecommended])
 
-  const handleApply = async (id: number) => {
+  // Open apply modal — or handle withdraw if already applied
+  const handleApply = (id: number) => {
     const appInfo = applicationMap[id]
-    
-    // If it's withdrawn, the user can't re-apply due to backend lock
+
+    // Withdrawn restriction
     if (appInfo?.status === 'Withdrawn') {
       const camp = displayCampaigns.find(c => c.id === id) || campaigns.find(c => c.id === id)
       setRestrictedAlert({ isOpen: true, campaignName: camp?.title || 'this campaign', campaignId: id })
       return
     }
 
+    // Already applied → withdraw flow (no modal needed)
     if (appInfo) {
-      // Withdraw Path
       setWithdrawing(id)
-      try {
-        await campaignApi.postapplicationswithdraw(appInfo.id)
-        const next = { ...applicationMap, [id]: { ...appInfo, status: 'Withdrawn' } }
-        saveApplicationMap(next)
-        toast.success('Application withdrawn successfully')
-        loadCampaigns()
-      } catch (err: any) {
-        toast.error('Failed to withdraw application')
-      } finally {
-        setWithdrawing(null)
-      }
+      campaignApi.postapplicationswithdraw(appInfo.id)
+        .then(() => {
+          saveApplicationMap({ ...applicationMap, [id]: { ...appInfo, status: 'Withdrawn' } })
+          toast.success('Application withdrawn successfully')
+          loadCampaigns()
+        })
+        .catch(() => toast.error('Failed to withdraw application'))
+        .finally(() => setWithdrawing(null))
       return
     }
 
-    // Apply Path
+    // Not yet applied → open modal
+    const camp = [...displayCampaigns, ...recommended].find(c => c.id === id)
+      || (selectedDetails?.id === id ? selectedDetails : null)
+    if (camp) setApplyModalCampaign(camp)
+  }
+
+  // Called by ApplyModal on submit
+  const handleApplySubmit = async (id: number, formData: ApplyFormData) => {
     setApplying(id)
-    const campaign = displayCampaigns.find(c => c.id === id)
-    if (campaign) {
+    const camp = [...displayCampaigns, ...recommended].find(c => c.id === id)
+      || (selectedDetails?.id === id ? selectedDetails : null)
+    if (camp) {
       activityTracker.addActivity({
-        description: `Applied to ${campaign.title} campaign`,
+        description: `Applied to ${camp.title} campaign`,
         type: 'application'
       })
     }
-
     try {
       const res = await campaignApi.postapply(id)
       const newApp = (res as any)?.data || res
-      const next = { ...applicationMap, [id]: { id: newApp.id, status: 'Pending' } }
-      saveApplicationMap(next)
-      toast.success('Applied successfully!')
+      
+      // Save application fields to localStorage
+      const appDetails = {
+        pitch: formData.pitch,
+        experienceLevel: formData.experienceLevel,
+        yearsExperience: formData.yearsExperience,
+        channels: formData.channels,
+        audienceSize: formData.audienceSize,
+        audienceLocation: formData.audienceLocation,
+        portfolioUrl: formData.portfolioUrl,
+        socialLink: formData.socialLink,
+        availableFrom: formData.availableFrom,
+        phoneNumber: formData.phoneNumber,
+        cvFileName: formData.cvFileName,
+        cvFileBase64: formData.cvFileBase64,
+        appliedAt: new Date().toISOString()
+      }
+      localStorage.setItem(`affilianze_app_details_${newApp.id}`, JSON.stringify(appDetails))
+
+      saveApplicationMap({ ...applicationMap, [id]: { id: newApp.id, status: 'Pending' } })
       loadCampaigns()
     } catch (err: any) {
       const msg = err.message || ''
       if (msg.includes('409') || msg.includes('400') || msg.includes('already exists')) {
-        toast.error('Application already processed. Refreshing status...')
-        // Sync map again to find the hidden application ID
         marketerApi.getmyapplications({ PageSize: 100, CampaignId: id }).then(res => {
           const apps = (res as any)?.items || (res as any)?.data?.items || (res as any)?.data || []
           if (Array.isArray(apps) && apps.length > 0) {
@@ -385,7 +410,7 @@ export default function FindCampaigns() {
           }
         })
       } else {
-        toast.error('Failed to apply. Please try again.')
+        throw err // bubble up to modal so it shows the error
       }
     } finally {
       setApplying(null)
@@ -433,6 +458,9 @@ export default function FindCampaigns() {
             className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/10 focus:border-[#1E3A8A] placeholder:text-gray-400"
           />
         </div>
+
+
+
 
         {/* Recommended Toggle */}
         <div className="bg-white rounded-xl border border-gray-100 p-4 mb-6 shadow-sm">
@@ -943,6 +971,18 @@ export default function FindCampaigns() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Apply Modal */}
+      {applyModalCampaign && (
+        <ApplyModal
+          campaign={applyModalCampaign as any}
+          onClose={() => setApplyModalCampaign(null)}
+          onSubmit={async (formData) => {
+            await handleApplySubmit(applyModalCampaign.id!, formData)
+            // Modal will show success screen — close modal after brief delay
+          }}
+        />
       )}
     </div>
   )

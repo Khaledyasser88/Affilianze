@@ -149,10 +149,17 @@ export default function Signup() {
       } else if (err?.response?.data?.title) {
         msg = err.response.data.title
       }
-      if (msg.toLowerCase().includes('not found') || msg.includes('404')) {
-        setError('API is not connected. Make sure the backend is running.')
-      } else if (msg.toLowerCase().includes('failed to fetch')) {
-        setError('Cannot reach API. Verify the backend is running on the correct port.')
+      if (
+        msg.toLowerCase().includes('not found') ||
+        msg.toLowerCase().includes('not_found') ||
+        msg.includes('404') ||
+        msg.toLowerCase().includes('page could not be found')
+      ) {
+        setError('Registration service is currently unavailable. Please try again later or contact support.')
+      } else if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror') || msg.toLowerCase().includes('msh mtsyl') || msg.toLowerCase().includes('api مش')) {
+        setError('Cannot reach the server. Please check your internet connection and try again.')
+      } else if (msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('انتهى وقته')) {
+        setError('The server took too long to respond. Please try again.')
       } else {
         setError(msg)
       }
@@ -442,6 +449,7 @@ export default function Signup() {
                         onChange={async (e) => {
                           const file = e.target.files?.[0]
                           if (!file) return
+                          e.target.value = ''
                           setFileName(file.name)
                           
                           // AI Verification
@@ -568,8 +576,15 @@ export default function Signup() {
                         onChange={async (e) => {
                           const file = e.target.files?.[0]
                           if (!file) return
+
+                          // Reset input value so the user can re-select the same file
+                          // or a different file and onChange will always fire
+                          e.target.value = ''
+
                           setCvFileName(file.name)
-                          
+                          // Clear old analysis immediately so stale data isn't shown
+                          setCvAnalysis(null)
+
                           // Analyze CV
                           setIsAnalyzingCV(true)
                           try {
@@ -690,7 +705,10 @@ export default function Signup() {
                         type="file" 
                         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" 
                         className="hidden"
-                        onChange={(e) => setFileName(e.target.files?.[0]?.name || '')}
+                        onChange={(e) => {
+                          setFileName(e.target.files?.[0]?.name || '')
+                          e.target.value = ''
+                        }}
                         required 
                       />
                       <input ref={logoRef} type="file" className="hidden" />

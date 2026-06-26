@@ -425,6 +425,7 @@ export default function Settings() {
                     <input type="file" className="hidden" accept="image/*" onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
+                        e.target.value = ''
                         const reader = new FileReader()
                         reader.onloadend = () => {
                           const img = new Image()
@@ -455,6 +456,7 @@ export default function Settings() {
                       <input type="file" className="hidden" accept="image/*" onChange={(e) => {
                         const file = e.target.files?.[0]
                         if (file) {
+                          e.target.value = ''
                           const reader = new FileReader()
                           reader.onloadend = () => {
                             const img = new Image()
@@ -639,6 +641,10 @@ export default function Settings() {
                             onChange={async (e) => {
                               const file = e.target.files?.[0]
                               if (!file) return
+                              e.target.value = ''
+                              // Clear old AI suggestions and review state
+                              setAiSuggestions(null)
+                              setShowAiReview(false)
                               toast.loading('Uploading CV...', { id: 'cv-upload' })
                               try {
                                 const formData = new FormData()
@@ -680,6 +686,7 @@ export default function Settings() {
                             onChange={async (e) => {
                               const file = e.target.files?.[0]
                               if (!file) return
+                              e.target.value = ''
                               toast.loading('Uploading National ID...', { id: 'id-upload' })
                               try {
                                 const formData = new FormData()
