@@ -8,11 +8,9 @@ const GEMINI_KEY   = () => (import.meta as any).env.VITE_GEMINI_API_KEY as strin
 const GROQ_KEY     = () => (import.meta as any).env.VITE_GROQ_API_KEY as string
 const HF_AI_BASE   = () => ((import.meta as any).env.VITE_HF_AI_BASE_URL as string) || 'https://swordha5-aiproject.hf.space'
 // In dev, route through the Vite proxy (/cv-api) to avoid CORS.
-// In production, call the HF Space directly (backend must have CORS enabled).
+// In production, we'll route through Vercel rewrites to avoid CORS.
 const HF_CV_ANALYSIS_BASE = () => {
-  const isDev = (import.meta as any).env.DEV
-  if (isDev) return '' // use /cv-api proxy path (no base needed)
-  return ((import.meta as any).env.VITE_HF_CV_ANALYSIS_URL as string) || 'https://swordha-cvanalysis.hf.space'
+  return ''
 }
 
 export interface PersonalityTestServiceResult {
@@ -237,9 +235,9 @@ export interface CVAnalysisResult {
 }
 
 export async function analyzeCVWithAI(file: File): Promise<CVAnalysisResult> {
-  // ── Try HF Space (via Vite proxy in dev, direct in prod) ──────────────────
+  // ── Try HF Space (via Vercel proxy) ──────────────────
   const base = HF_CV_ANALYSIS_BASE()
-  const proxyPath = (import.meta as any).env.DEV ? '/cv-api' : ''
+  const proxyPath = '/cv-api'
   const url = `${base}${proxyPath}/v1/cv/analyze?_t=${Date.now()}`
 
   try {

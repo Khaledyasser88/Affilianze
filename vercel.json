@@ -13,6 +13,10 @@
       "destination": "/api/proxy?prefix=api&path=$1"
     },
     {
+      "source": "/cv-api/(.*)",
+      "destination": "https://swordha-cvanalysis.hf.space/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
