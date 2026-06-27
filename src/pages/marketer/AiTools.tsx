@@ -147,7 +147,7 @@ export default function AiTools() {
     }
   }, [activeTab])
 
-  // ─── CV ANALYSIS (uses Gemini multimodal - sends PDF directly) ────
+  // ─── CV ANALYSIS (uses Hugging Face CV API via proxy) ────
   const handleCvUpload = async (file: File) => {
     // Clear everything first so stale results never show
     setCvFile(null)
