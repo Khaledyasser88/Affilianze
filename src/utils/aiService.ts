@@ -234,11 +234,17 @@ export interface CVAnalysisResult {
   summary: string
 }
 
-export async function analyzeCVWithAI(file: File): Promise<CVAnalysisResult> {
+export async function analyzeCVWithAI(
+  file: File,
+  options?: { language?: string; topK?: number }
+): Promise<CVAnalysisResult> {
   // ── Try HF Space (via Vercel proxy) ──────────────────
   const base = HF_CV_ANALYSIS_BASE()
   const proxyPath = '/cv-api'
-  const url = `${base}${proxyPath}/v1/cv/analyze?_t=${Date.now()}`
+  
+  let url = `${base}${proxyPath}/v1/cv/analyze?_t=${Date.now()}`
+  if (options?.language) url += `&language=${encodeURIComponent(options.language)}`
+  if (options?.topK) url += `&top_k=${options.topK}`
 
   try {
     const formData = new FormData()

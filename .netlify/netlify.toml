@@ -27,6 +27,18 @@ command = "npm run build"
 [build.services]
 
 [[redirects]]
+from = "/backend-api/*"
+to = "http://affilliance.runasp.net/api/:splat"
+status = 200.0
+force = true
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
 from = "/api/*"
 to = "http://affilliance.runasp.net/api/:splat"
 status = 200.0

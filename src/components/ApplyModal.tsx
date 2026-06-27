@@ -127,7 +127,6 @@ export default function ApplyModal({ campaign, onClose, onSubmit }: ApplyModalPr
         : `EGP ${campaign.commissionValue} per action`
       : null
 
-  // ─── Success Screen ───────────────────────────────────────────────────
   if (submitted) {
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
@@ -162,7 +161,6 @@ export default function ApplyModal({ campaign, onClose, onSubmit }: ApplyModalPr
     )
   }
 
-  // ─── Modal ────────────────────────────────────────────────────────────
   return (
     <div
       className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-md"
@@ -172,7 +170,6 @@ export default function ApplyModal({ campaign, onClose, onSubmit }: ApplyModalPr
         className="bg-white w-full sm:max-w-2xl max-h-[95dvh] sm:max-h-[90vh] rounded-t-[36px] sm:rounded-[36px] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-300"
         onClick={e => e.stopPropagation()}
       >
-        {/* ── Header ── */}
         <div className="relative bg-gradient-to-br from-[#1E3A8A] to-[#0F1D45] px-8 pt-8 pb-6 text-white flex-shrink-0">
           <button
             onClick={onClose}
@@ -197,7 +194,6 @@ export default function ApplyModal({ campaign, onClose, onSubmit }: ApplyModalPr
             <p className="text-blue-200 font-medium text-[13px] mt-1">{campaign.companyName}</p>
           )}
 
-          {/* Step Progress */}
           <div className="flex items-center gap-3 mt-5">
             {(['Your Pitch', 'Channels & Reach', 'Final Details'] as const).map((label, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -217,12 +213,30 @@ export default function ApplyModal({ campaign, onClose, onSubmit }: ApplyModalPr
           </div>
         </div>
 
-        {/* ── Body ── */}
         <div className="flex-1 overflow-y-auto px-8 py-7 space-y-6">
 
-          {/* STEP 1 — Pitch */}
           {step === 1 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              
+              {(campaign.description || campaign.categoryName) && (
+                <div className="bg-[#1E3A8A]/5 p-5 rounded-2xl border border-[#1E3A8A]/10">
+                  <h3 className="text-[11px] font-black text-[#1E3A8A] uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Campaign Summary
+                  </h3>
+                  {campaign.categoryName && (
+                    <span className="inline-block px-2.5 py-1 bg-white rounded-md text-[#1E3A8A] text-[10px] font-black uppercase tracking-wider mb-2 shadow-sm border border-[#1E3A8A]/10">
+                      {campaign.categoryName}
+                    </span>
+                  )}
+                  {campaign.description && (
+                    <p className="text-[13px] text-slate-600 font-medium leading-relaxed max-h-[120px] overflow-y-auto pr-2">
+                      {campaign.description}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">
                   Why are you a great fit for this campaign? *
@@ -281,7 +295,6 @@ export default function ApplyModal({ campaign, onClose, onSubmit }: ApplyModalPr
             </div>
           )}
 
-          {/* STEP 2 — Channels & Reach */}
           {step === 2 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
               <div>
@@ -350,7 +363,6 @@ export default function ApplyModal({ campaign, onClose, onSubmit }: ApplyModalPr
             </div>
           )}
 
-          {/* STEP 3 — Final Details */}
           {step === 3 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -408,7 +420,6 @@ export default function ApplyModal({ campaign, onClose, onSubmit }: ApplyModalPr
                 />
               </div>
 
-              {/* Upload CV Dropzone */}
               <div>
                 <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">
                   Upload CV / Resume *
@@ -432,7 +443,6 @@ export default function ApplyModal({ campaign, onClose, onSubmit }: ApplyModalPr
                 />
               </div>
 
-              {/* Application Summary Card */}
               <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-3">
                 <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Application Summary</p>
                 <div className="flex flex-wrap gap-2">
@@ -468,7 +478,6 @@ export default function ApplyModal({ campaign, onClose, onSubmit }: ApplyModalPr
           )}
         </div>
 
-        {/* ── Footer ── */}
         <div className="px-8 py-5 border-t border-slate-50 flex items-center gap-3 flex-shrink-0 bg-white">
           {step > 1 && (
             <button
