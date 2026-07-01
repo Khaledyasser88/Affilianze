@@ -20,19 +20,13 @@ export default function Footer() {
           
           {/* Column 1: Brand & Social */}
           <div className="space-y-6">
-            <Link to="/" className="flex items-center group gap-0">
-              <div 
-                className="w-10 h-10 transition-transform group-hover:scale-110"
-                style={{
-                  backgroundImage: 'url(/favicon.png)',
-                  backgroundSize: 'contain',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'center',
-                  backgroundColor: '#1F5BA8',
-                  backgroundBlendMode: 'multiply'
-                }}
+            <Link to="/" className="flex items-center group gap-0 w-fit">
+              <img 
+                src="/logo.png" 
+                alt="Affilianze" 
+                className="h-20 w-auto object-contain transition-transform group-hover:scale-105" 
+                style={{ mixBlendMode: 'multiply' }}
               />
-              <span className="text-[26px] font-bold tracking-tight -ml-2 bg-gradient-to-r from-[#A7F3D0] to-[#10B981] bg-clip-text text-transparent">ffilianze</span>
             </Link>
             <p className="text-white/80 text-[14px] leading-relaxed max-w-[280px]">
               Connecting marketers and advertisers through intelligent AI-powered campaign matching.

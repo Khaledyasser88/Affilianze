@@ -35,7 +35,7 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 transition-all duration-300">
-      <div className="max-w-7xl mx-auto px-6 h-[72px] flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-6 h-[88px] flex items-center justify-between">
         <div className="flex-1 flex justify-start items-center">
           <Link to="/" className="flex items-center group gap-0.5">
             <motion.div
@@ -44,20 +44,12 @@ export default function Navbar() {
               transition={{ duration: 0.5, ease: "easeOut" }}
             >
               <img 
-                src="/favicon.png" 
-                alt="A" 
-                className="w-10 h-10 object-contain transition-transform group-hover:scale-110" 
-                style={{ mixBlendMode: 'darken' }} 
+                src="/logo.png" 
+                alt="Affilianze" 
+                className="h-20 w-auto object-contain transition-transform group-hover:scale-105" 
+                style={{ mixBlendMode: 'multiply' }}
               />
             </motion.div>
-            <motion.span 
-              initial={isHome ? { width: 0, opacity: 0, x: -10 } : false}
-              animate={{ width: "auto", opacity: 1, x: 0 }}
-              transition={{ delay: 0.5, duration: 0.8, ease: "easeOut" }}
-              className="text-[26px] font-bold tracking-tight -ml-2 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] bg-clip-text text-transparent overflow-hidden whitespace-nowrap"
-            >
-              ffilianze
-            </motion.span>
           </Link>
         </div>
 

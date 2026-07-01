@@ -185,7 +185,7 @@ export default function Home() {
       <section className="py-20 bg-white px-6">
         <div className="max-w-7xl mx-auto text-center">
           <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-[30px] md:text-[36px] font-extrabold text-slate-900 mb-4 flex items-center justify-center gap-2">
-            Why Choose <div className="flex items-center gap-1.5"><img src="/favicon.png" alt="A" className="w-10 h-10 object-contain mix-blend-multiply" /><span>ffilianze?</span></div>
+            Why Choose <img src="/logo.png" alt="Affilianze" className="h-10 w-auto object-contain" style={{ mixBlendMode: 'multiply' }} />
           </motion.h2>
           <p className="text-gray-500 text-[15px] mb-14 max-w-xl mx-auto">Everything you need to succeed in affiliate marketing, all in one platform.</p>
           <motion.div 
@@ -209,7 +209,7 @@ export default function Home() {
       <section id="about" className="py-20 bg-[#F9FAFB] px-6">
         <div className="max-w-7xl mx-auto text-center">
           <h2 className="text-[30px] md:text-[36px] font-extrabold text-slate-900 mb-4 flex items-center justify-center gap-2">
-            About <div className="flex items-center gap-1.5"><img src="/favicon.png" alt="A" className="w-10 h-10 object-contain mix-blend-multiply" /><span>ffilianze</span></div>
+            About <img src="/logo.png" alt="Affilianze" className="h-10 w-auto object-contain" style={{ mixBlendMode: 'multiply' }} />
           </h2>
           <p className="text-gray-500 text-[15px] mb-14 max-w-xl mx-auto">Learn more about our platform and what drives us forward.</p>
           <motion.div 

@@ -110,7 +110,7 @@ export default function DashboardNav() {
   }
 
   return (
-    <header className="bg-white border-b border-gray-100 sticky top-0 z-40 h-[72px] flex items-center">
+    <header className="bg-white border-b border-gray-100 sticky top-0 z-40 h-[88px] flex items-center">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="flex justify-between items-center">
           {/* Logo & Mobile Toggle */}
@@ -125,8 +125,7 @@ export default function DashboardNav() {
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
               <Link to="/" className="flex items-center group">
-                <img src="/favicon.png" alt="A" className="w-8 h-8 object-contain transition-transform group-hover:scale-110" style={{ mixBlendMode: 'multiply' }} />
-                <span className="text-[20px] md:text-[22px] font-bold bg-gradient-to-r from-[#1E3A8A] to-[#10B981] bg-clip-text text-transparent tracking-tight -ml-1">ffilianze</span>
+                <img src="/logo.png" alt="Affilianze" className="h-20 w-auto object-contain transition-transform group-hover:scale-105" style={{ mixBlendMode: 'multiply' }} />
               </Link>
             </div>
             
