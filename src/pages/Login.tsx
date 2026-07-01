@@ -43,7 +43,7 @@ export default function Login() {
             <h1 className="text-white text-center leading-tight">
               <span className="text-2xl md:text-3xl lg:text-4xl font-black block">
                 <span className="opacity-90">Welcome Back to </span>
-                <span className="bg-gradient-to-r from-[#A7F3D0] to-[#10B981] bg-clip-text text-transparent">Affilianze</span>
+                <span className="text-black">Affili</span><span className="text-[#60A5FA]">anze</span>
               </span>
             </h1>
             <p className="mt-6 text-sm text-blue-100/80 font-medium leading-relaxed max-w-[280px] mx-auto text-center">
