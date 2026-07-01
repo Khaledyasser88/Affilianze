@@ -185,7 +185,7 @@ export default function Signup() {
           
           <div className="relative z-10 text-white space-y-8">
             <h1 className="text-white text-left leading-tight">
-              <span className="text-3xl md:text-5xl font-black block">Join <span className="text-black">Affili</span><span className="text-[#60A5FA]">anze</span></span>
+              <span className="text-3xl md:text-5xl font-black block">Join <span className="text-black/70">Affili</span><span className="text-[#60A5FA]">anze</span></span>
               <span className="text-3xl md:text-5xl font-black block">Today</span>
             </h1>
             <p className="text-blue-100/70 text-[14px] font-medium max-w-[280px] leading-relaxed">
