@@ -147,12 +147,13 @@ export default function Messages() {
       
       let aiResponse: string | null = null
 
-      // Try the backend chatbot API first (now sends correct "Text" field)
+      // Try the chatbot API first
       try {
         const res = await chatbotApi.postsend(prompt)
-        aiResponse = res?.response || res?.data?.response || res?.reply || res?.data?.reply || res?.text || res?.data?.text || (typeof res === 'string' ? res : null)
+        const maybeResponse = (res as any)?.response ?? (res as any)?.data?.response ?? (res as any)?.reply ?? (res as any)?.data?.reply ?? (res as any)?.text ?? (res as any)?.data?.text ?? (typeof res === 'string' ? res : null)
+        aiResponse = typeof maybeResponse === 'string' ? maybeResponse : null
       } catch (backendErr) {
-        console.warn('Backend chatbot unavailable for Messages, trying Gemini fallback...', backendErr)
+        console.warn('Chatbot unavailable for Messages, trying Gemini fallback...', backendErr)
       }
 
       // Fallback: use Google Gemini API if backend failed and key is configured
