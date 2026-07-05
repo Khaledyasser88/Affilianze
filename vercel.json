@@ -17,6 +17,10 @@
       "destination": "https://swordha-cvanalysis.hf.space/$1"
     },
     {
+      "source": "/chatbot-proxy/(.*)",
+      "destination": "https://mo7amedddd-api-chatbot.hf.space/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

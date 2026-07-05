@@ -172,6 +172,13 @@ export default function Signup() {
   const inputWithIconClass = inputClass + " pl-11"
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5"
 
+  const openFilePicker = (ref: React.RefObject<HTMLInputElement | null>) => {
+    if (ref.current) {
+      ref.current.value = ''
+      ref.current.click()
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center p-4 md:p-6 font-sans">
       
@@ -422,7 +429,7 @@ export default function Signup() {
                     <div className="space-y-3">
                       <label className={labelClass}>Upload Your National ID *</label>
                       <div 
-                        onClick={() => !isAnalyzingID && nationalIdRef.current?.click()} 
+                        onClick={() => !isAnalyzingID && openFilePicker(nationalIdRef)} 
                         className={`border-2 border-dashed rounded-xl py-5 px-4 text-center cursor-pointer transition-all ${isAnalyzingID ? 'border-blue-200 bg-blue-50/50 cursor-wait' : 'border-gray-200 hover:border-[#1E3A8A]/30 hover:bg-blue-50/20'}`}
                       >
                         <div className="flex flex-col items-center justify-center gap-2">
@@ -449,7 +456,6 @@ export default function Signup() {
                         onChange={async (e) => {
                           const file = e.target.files?.[0]
                           if (!file) return
-                          e.target.value = ''
                           setFileName(file.name)
                           
                           // AI Verification
@@ -558,7 +564,7 @@ export default function Signup() {
                     <div>
                       <label className={labelClass}>Upload Your CV/Resume (Optional)</label>
                       <div 
-                        onClick={() => cvRef.current?.click()} 
+                        onClick={() => openFilePicker(cvRef)} 
                         className="border-2 border-dashed border-gray-200 rounded-xl py-4 px-4 text-center cursor-pointer hover:border-[#1E3A8A]/30 hover:bg-blue-50/20 transition-all"
                       >
                         <div className="flex items-center justify-center gap-2">
@@ -576,10 +582,6 @@ export default function Signup() {
                         onChange={async (e) => {
                           const file = e.target.files?.[0]
                           if (!file) return
-
-                          // Reset input value so the user can re-select the same file
-                          // or a different file and onChange will always fire
-                          e.target.value = ''
 
                           setCvFileName(file.name)
                           // Clear old analysis immediately so stale data isn't shown
@@ -689,7 +691,7 @@ export default function Signup() {
                     <div>
                       <label className={labelClass}>Upload Company Documents *</label>
                       <div 
-                        onClick={() => commercialRegisterRef.current?.click()} 
+                        onClick={() => openFilePicker(commercialRegisterRef)} 
                         className="border-2 border-dashed border-gray-200 rounded-lg py-4 px-4 text-center cursor-pointer hover:border-[#1E3A8A]/30 hover:bg-blue-50/20 transition-all"
                       >
                         <div className="flex items-center justify-center gap-2">
@@ -707,7 +709,6 @@ export default function Signup() {
                         className="hidden"
                         onChange={(e) => {
                           setFileName(e.target.files?.[0]?.name || '')
-                          e.target.value = ''
                         }}
                         required 
                       />
