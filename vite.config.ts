@@ -23,6 +23,13 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/cv-api/, ''),
         },
+        // Proxy for the Hugging Face chatbot space so the browser can reach it without CSP issues
+        '/chatbot-proxy': {
+          target: 'https://mo7amedddd-api-chatbot.hf.space',
+          changeOrigin: true,
+          secure: true,
+          rewrite: (path) => path.replace(/^\/chatbot-proxy/, ''),
+        },
       },
     },
     esbuild: {

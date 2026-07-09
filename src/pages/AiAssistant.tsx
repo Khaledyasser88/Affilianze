@@ -99,11 +99,12 @@ export default function AiAssistant() {
 
       let aiResponse: string | null = null
 
-      // 1️⃣ Priority: Backend API
+      
       try {
         const res = await chatbotApi.postsend(`${systemPrompt}\n\nQuestion: ${messageText}`)
-        aiResponse = res?.response || res?.data?.response || res?.reply || res?.data?.reply || res?.text || res?.data?.text || (typeof res === 'string' ? res : null)
-      } catch (err) { console.warn('Backend fallback') }
+        const maybeResponse = (res as any)?.response ?? (res as any)?.data?.response ?? (res as any)?.reply ?? (res as any)?.data?.reply ?? (res as any)?.text ?? (res as any)?.data?.text ?? (typeof res === 'string' ? res : null)
+        aiResponse = typeof maybeResponse === 'string' ? maybeResponse : null
+      } catch (err) { console.warn('Hugging Face chatbot unavailable, trying next fallback', err) }
 
       // 2️⃣ Fallback: Groq
       if (!aiResponse) {
@@ -144,7 +145,9 @@ export default function AiAssistant() {
       if (aiResponse) {
         await simulateTyping(aiResponse)
       } else {
-        await simulateTyping("I'm having trouble connecting to my brain right now. Please check your internet or try again later.")
+        await simulateTyping(language === 'Arabic'
+          ? 'لم أتمكن من الحصول على رد من المساعد في الوقت الحالي. سأساعدك بدلًا من ذلك مع نصيحة عملية قصيرة عن التسويق بالعمولة.'
+          : "I'm having trouble reaching the assistant right now, so here's a quick practical tip instead: focus on one clear benefit, one strong call to action, and a simple proof point.")
       }
     } catch (err) {
       toast.error('Connection error')

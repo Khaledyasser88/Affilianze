@@ -29,6 +29,15 @@ interface GeneratedPost {
   copied: boolean
 }
 
+interface ExperienceEntry {
+  company: string
+  title: string
+  start_date: string
+  end_date: string
+  location: string
+  bullets: string
+}
+
 export default function AiTools() {
   const { name, email, phone } = useAuth()
   const [activeTab, setActiveTab] = useState<TabKey>('cv')
@@ -54,6 +63,27 @@ export default function AiTools() {
     summary: ''
   })
   const [cvGeneratorSkills, setCvGeneratorSkills] = useState('')
+  const [cvGeneratorSoftSkills, setCvGeneratorSoftSkills] = useState('')
+  const [cvGeneratorTools, setCvGeneratorTools] = useState('')
+  const [cvGeneratorTargetJobTitle, setCvGeneratorTargetJobTitle] = useState('')
+  const [cvGeneratorEducation, setCvGeneratorEducation] = useState({
+    institution: '',
+    degree: '',
+    field: '',
+    start_date: '',
+    end_date: '',
+    gpa: '',
+  })
+  const [cvGeneratorExperiences, setCvGeneratorExperiences] = useState<ExperienceEntry[]>([
+    {
+      company: '',
+      title: '',
+      start_date: '',
+      end_date: '',
+      location: '',
+      bullets: '',
+    },
+  ])
 
   useEffect(() => {
     setCvGeneratorForm((prev) => ({
@@ -213,6 +243,44 @@ export default function AiTools() {
     setCvGeneratedFileName(null)
 
     try {
+      const technicalSkills = cvGeneratorSkills
+        .split(/\n|,|;/)
+        .map((skill) => skill.trim())
+        .filter(Boolean)
+      const softSkills = cvGeneratorSoftSkills
+        .split(/\n|,|;/)
+        .map((skill) => skill.trim())
+        .filter(Boolean)
+      const tools = cvGeneratorTools
+        .split(/\n|,|;/)
+        .map((tool) => tool.trim())
+        .filter(Boolean)
+
+      const education = [
+        {
+          institution: cvGeneratorEducation.institution.trim(),
+          degree: cvGeneratorEducation.degree.trim() || undefined,
+          field: cvGeneratorEducation.field.trim() || undefined,
+          start_date: cvGeneratorEducation.start_date.trim() || undefined,
+          end_date: cvGeneratorEducation.end_date.trim() || undefined,
+          gpa: cvGeneratorEducation.gpa.trim() || undefined,
+        },
+      ].filter((entry) => Object.values(entry).some((value) => Boolean(value)))
+
+      const experience = cvGeneratorExperiences
+        .map((entry) => ({
+          company: entry.company.trim(),
+          title: entry.title.trim() || undefined,
+          start_date: entry.start_date.trim() || undefined,
+          end_date: entry.end_date.trim() || undefined,
+          location: entry.location.trim() || undefined,
+          bullets: entry.bullets
+            .split(/\n|;/)
+            .map((bullet) => bullet.trim())
+            .filter(Boolean),
+        }))
+        .filter((entry) => Object.values(entry).some((value) => Boolean(value)))
+
       const request: CVGenerateRequest = {
         personal: {
           ...cvGeneratorForm,
@@ -223,8 +291,13 @@ export default function AiTools() {
           summary: cvGeneratorForm.summary || undefined,
         },
         skills: {
-          technical: cvGeneratorSkills.split(',').map((skill) => skill.trim()).filter(Boolean)
-        }
+          technical: technicalSkills.length ? technicalSkills : undefined,
+          soft: softSkills.length ? softSkills : undefined,
+          tools: tools.length ? tools : undefined,
+        },
+        education: education.length ? education : undefined,
+        experience: experience.length ? experience : undefined,
+        target_job_title: cvGeneratorTargetJobTitle || undefined,
       }
 
       const result = await generateCVWithAI(request)
@@ -623,16 +696,213 @@ export default function AiTools() {
                 />
               </label>
 
-              <label className="space-y-2">
-                <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Key skills (comma-separated)</span>
-                <input
-                  type="text"
-                  value={cvGeneratorSkills}
-                  onChange={(e) => setCvGeneratorSkills(e.target.value)}
-                  className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
-                  placeholder="e.g. digital marketing, campaign strategy, influencer outreach"
-                />
-              </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Target Job Title</span>
+                  <input
+                    type="text"
+                    value={cvGeneratorTargetJobTitle}
+                    onChange={(e) => setCvGeneratorTargetJobTitle(e.target.value)}
+                    className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                    placeholder="Backend Developer"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Technical Skills</span>
+                  <textarea
+                    rows={3}
+                    value={cvGeneratorSkills}
+                    onChange={(e) => setCvGeneratorSkills(e.target.value)}
+                    className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                    placeholder="Python, React, SEO"
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Soft Skills</span>
+                  <textarea
+                    rows={3}
+                    value={cvGeneratorSoftSkills}
+                    onChange={(e) => setCvGeneratorSoftSkills(e.target.value)}
+                    className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                    placeholder="Communication, Leadership"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Tools</span>
+                  <textarea
+                    rows={3}
+                    value={cvGeneratorTools}
+                    onChange={(e) => setCvGeneratorTools(e.target.value)}
+                    className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                    placeholder="Docker, Git, AWS"
+                  />
+                </label>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Education</span>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-semibold text-gray-500">Institution</span>
+                    <input
+                      type="text"
+                      value={cvGeneratorEducation.institution}
+                      onChange={(e) => setCvGeneratorEducation((prev) => ({ ...prev, institution: e.target.value }))}
+                      className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                      placeholder="Cairo University"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-semibold text-gray-500">Degree</span>
+                    <input
+                      type="text"
+                      value={cvGeneratorEducation.degree}
+                      onChange={(e) => setCvGeneratorEducation((prev) => ({ ...prev, degree: e.target.value }))}
+                      className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                      placeholder="Bachelor of Science"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-semibold text-gray-500">Field</span>
+                    <input
+                      type="text"
+                      value={cvGeneratorEducation.field}
+                      onChange={(e) => setCvGeneratorEducation((prev) => ({ ...prev, field: e.target.value }))}
+                      className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                      placeholder="Computer Science"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-semibold text-gray-500">GPA</span>
+                    <input
+                      type="text"
+                      value={cvGeneratorEducation.gpa}
+                      onChange={(e) => setCvGeneratorEducation((prev) => ({ ...prev, gpa: e.target.value }))}
+                      className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                      placeholder="3.7"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-semibold text-gray-500">Start Date</span>
+                    <input
+                      type="text"
+                      value={cvGeneratorEducation.start_date}
+                      onChange={(e) => setCvGeneratorEducation((prev) => ({ ...prev, start_date: e.target.value }))}
+                      className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                      placeholder="Sep 2018"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-semibold text-gray-500">End Date</span>
+                    <input
+                      type="text"
+                      value={cvGeneratorEducation.end_date}
+                      onChange={(e) => setCvGeneratorEducation((prev) => ({ ...prev, end_date: e.target.value }))}
+                      className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                      placeholder="Jun 2022"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 mt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Experience</span>
+                  <button
+                    type="button"
+                    onClick={() => setCvGeneratorExperiences((prev) => [...prev, { company: '', title: '', start_date: '', end_date: '', location: '', bullets: '' }])}
+                    className="text-[11px] font-semibold text-[#1E3A8A] hover:text-[#152C6E]"
+                  >
+                    + Add another experience
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {cvGeneratorExperiences.map((experience, index) => (
+                    <div key={index} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Role {index + 1}</span>
+                        {cvGeneratorExperiences.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setCvGeneratorExperiences((prev) => prev.filter((_, i) => i !== index))}
+                            className="text-[11px] font-semibold text-rose-500 hover:text-rose-600"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="space-y-2">
+                          <span className="text-[11px] font-semibold text-gray-500">Company</span>
+                          <input
+                            type="text"
+                            value={experience.company}
+                            onChange={(e) => setCvGeneratorExperiences((prev) => prev.map((item, i) => i === index ? { ...item, company: e.target.value } : item))}
+                            className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                            placeholder="Tech Corp"
+                          />
+                        </label>
+                        <label className="space-y-2">
+                          <span className="text-[11px] font-semibold text-gray-500">Title</span>
+                          <input
+                            type="text"
+                            value={experience.title}
+                            onChange={(e) => setCvGeneratorExperiences((prev) => prev.map((item, i) => i === index ? { ...item, title: e.target.value } : item))}
+                            className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                            placeholder="Backend Developer"
+                          />
+                        </label>
+                        <label className="space-y-2">
+                          <span className="text-[11px] font-semibold text-gray-500">Start Date</span>
+                          <input
+                            type="text"
+                            value={experience.start_date}
+                            onChange={(e) => setCvGeneratorExperiences((prev) => prev.map((item, i) => i === index ? { ...item, start_date: e.target.value } : item))}
+                            className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                            placeholder="Jul 2022"
+                          />
+                        </label>
+                        <label className="space-y-2">
+                          <span className="text-[11px] font-semibold text-gray-500">End Date</span>
+                          <input
+                            type="text"
+                            value={experience.end_date}
+                            onChange={(e) => setCvGeneratorExperiences((prev) => prev.map((item, i) => i === index ? { ...item, end_date: e.target.value } : item))}
+                            className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                            placeholder="Present"
+                          />
+                        </label>
+                        <label className="space-y-2 md:col-span-2">
+                          <span className="text-[11px] font-semibold text-gray-500">Location</span>
+                          <input
+                            type="text"
+                            value={experience.location}
+                            onChange={(e) => setCvGeneratorExperiences((prev) => prev.map((item, i) => i === index ? { ...item, location: e.target.value } : item))}
+                            className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                            placeholder="Remote / Cairo, Egypt"
+                          />
+                        </label>
+                        <label className="space-y-2 md:col-span-2">
+                          <span className="text-[11px] font-semibold text-gray-500">Role Details</span>
+                          <textarea
+                            rows={4}
+                            value={experience.bullets}
+                            onChange={(e) => setCvGeneratorExperiences((prev) => prev.map((item, i) => i === index ? { ...item, bullets: e.target.value } : item))}
+                            className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                            placeholder="Built REST APIs serving 100K+ daily users&#10;Reduced query latency by 40% via indexing"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-8">

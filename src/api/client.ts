@@ -1421,22 +1421,48 @@ export const chatApi = {
 };
 
 export const chatbotApi = {
-  
-  postsend: (input: string | FormData) => {
-    let form: FormData;
+  postsend: async (input: string | FormData) => {
+    let text = '';
+
     if (typeof input === 'string') {
-      form = new FormData();
-      form.append('Text', input);
+      text = input;
     } else {
-      form = input;
-      
-      if (form.has('message') && !form.has('Text')) {
-        const msg = form.get('message') as string;
-        form.delete('message');
-        form.append('Text', msg);
-      }
+      const directText = input.get('Text') || input.get('text') || input.get('message');
+      text = typeof directText === 'string' ? directText : '';
     }
-    return api.post<any>(`/api/Chatbot/send`, form);
+
+    const formData = new FormData();
+    formData.append('text', text);
+
+    const response = await fetch('/chatbot-proxy/chat', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Chatbot request failed: ${response.status} ${errorText}`);
+    }
+
+    const responseText = await response.text();
+    let payload: any = null;
+
+    try {
+      payload = responseText ? JSON.parse(responseText) : null;
+    } catch {
+      payload = null;
+    }
+
+    if (typeof payload === 'string') {
+      return { response: payload };
+    }
+
+    if (payload && typeof payload === 'object') {
+      const normalized = payload.response ?? payload.reply ?? payload.text ?? payload.message ?? payload.answer ?? payload.output ?? payload.result ?? null;
+      return { response: normalized ?? responseText };
+    }
+
+    return { response: responseText };
   }
 };
 
