@@ -76,7 +76,8 @@ export default function Messages() {
   const [isTyping, setIsTyping] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const currentUserId = getCurrentUserId()
-  const { role } = useAuth()
+  const { role, name: authName } = useAuth()
+  const userName = authName?.split(' ')[0] || 'there'
 
   const buildConversations = useCallback((messages: MessageDto[]): Conversation[] => {
     const map = new Map<number, Conversation>()
@@ -178,7 +179,7 @@ export default function Messages() {
             senderName: c.name,
             receiverId: currentUserId || 999,
             receiverName: 'Me',
-            content: `Hi! I'm the representative for ${c.company || c.name}. Let's discuss our affiliate partnership!`,
+            content: `Hi ${userName}! I'm your AI assistant representing ${c.company || c.name}. How can I help you today?`,
             sentAt: new Date(Date.now() - 3600000).toISOString(),
             isRead: true
           }]
@@ -212,7 +213,7 @@ export default function Messages() {
   const simulateAiReply = async (partnerId: number, partnerName: string, userText: string) => {
     setIsTyping(true)
     try {
-      const prompt = `Act as ${partnerName} representative. A marketer said: "${userText}". Keep it professional and related to affiliate marketing.`
+      const prompt = `You are an AI assistant representing ${partnerName}. Address the user by name: ${userName}. They said: "${userText}". Reply professionally about affiliate marketing.`
       
       let aiResponse: string | null = null
 
