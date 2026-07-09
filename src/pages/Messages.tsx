@@ -213,42 +213,75 @@ export default function Messages() {
   const simulateAiReply = async (partnerId: number, partnerName: string, userText: string) => {
     setIsTyping(true)
     try {
-      const prompt = `You are an AI assistant representing ${partnerName}. Address the user by name: ${userName}. They said: "${userText}". Reply professionally about affiliate marketing.`
-      
+      // Build conversation history from localStorage
+      const saved = localStorage.getItem('affilianze_chat_messages')
+      const messageMap = saved ? JSON.parse(saved) : {}
+      const history: MessageDto[] = messageMap[partnerId] || []
+
+      // Build Gemini multi-turn contents format
+      const systemInstruction = `You are ${partnerName}, an affiliate marketing representative. 
+The user's name is ${userName}. 
+Always respond naturally in the context of the ongoing conversation. 
+Be helpful, engaging, concise, and relevant to affiliate marketing. 
+Never repeat the same response. Vary your wording each time.`
+
+      // Build conversation turns for multi-turn Gemini call
+      const turns = history.slice(-10).map((m: any) => ({
+        role: m.senderId === partnerId ? 'model' : 'user',
+        parts: [{ text: m.content || '' }]
+      })).filter((t: any) => t.parts[0].text)
+
+      // Add the new user message
+      turns.push({ role: 'user', parts: [{ text: userText }] })
+
       let aiResponse: string | null = null
 
-      try {
-        const res = await chatbotApi.postsend(prompt) as any
-        aiResponse = res?.response || res?.data?.response || res?.reply || res?.data?.reply || res?.text || res?.data?.text || (typeof res === 'string' ? res : null)
-      } catch (backendErr) {
-        console.warn('Backend chatbot unavailable, trying Gemini fallback...', backendErr)
+      // Try Gemini first with full conversation context
+      const geminiKey = import.meta.env.VITE_GEMINI_API_KEY as string
+      if (geminiKey) {
+        try {
+          const geminiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                system_instruction: { parts: [{ text: systemInstruction }] },
+                contents: turns,
+                generationConfig: { maxOutputTokens: 256, temperature: 0.9 }
+              })
+            }
+          )
+          const geminiData = await geminiRes.json()
+          if (!geminiData.error) {
+            aiResponse = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || null
+          }
+        } catch (geminiErr) {
+          console.warn('Gemini failed, trying chatbot API...', geminiErr)
+        }
       }
 
+      // Fallback: try the backend chatbot API
       if (!aiResponse) {
-        const geminiKey = import.meta.env.VITE_GEMINI_API_KEY as string
-        if (geminiKey) {
-          try {
-            const geminiRes = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: prompt }] }],
-                  generationConfig: { maxOutputTokens: 512, temperature: 0.7 }
-                })
-              }
-            )
-            const geminiData = await geminiRes.json()
-            if (geminiData.error) {
-              aiResponse = `Gemini API Error: ${geminiData.error.message}`
-            } else {
-              aiResponse = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || null
-            }
-          } catch (geminiErr) {
-            console.error('Gemini fallback failed:', geminiErr)
-          }
+        try {
+          const contextPrompt = `${systemInstruction}\n\nConversation so far:\n${history.slice(-6).map((m: any) => `${m.senderId === partnerId ? partnerName : userName}: ${m.content}`).join('\n')}\n\n${userName}: ${userText}\n${partnerName}:`
+          const res = await chatbotApi.postsend(contextPrompt) as any
+          aiResponse = res?.response || res?.data?.response || res?.reply || res?.text || (typeof res === 'string' ? res : null)
+        } catch (backendErr) {
+          console.warn('Chatbot API also unavailable:', backendErr)
         }
+      }
+
+      // Last resort: varied contextual fallback messages
+      if (!aiResponse) {
+        const fallbacks = [
+          `Thanks ${userName}! That's a great point. Let me get back to you with more details about our ${partnerName} program.`,
+          `${userName}, I appreciate your interest! Our affiliate program offers competitive commissions. What specific aspect would you like to know more about?`,
+          `Good question ${userName}! We're very excited about this campaign. Would you like to discuss the commission structure or the promotional materials?`,
+          `${userName}, absolutely! We've had great success with affiliates who focus on targeted audiences. Tell me more about your reach.`,
+          `That's exactly the kind of engagement we're looking for, ${userName}! Let's set up a quick call to discuss the details?`
+        ]
+        aiResponse = fallbacks[Math.floor(Math.random() * fallbacks.length)]
       }
 
       if (!aiResponse) {
@@ -266,10 +299,10 @@ export default function Messages() {
         isRead: false
       }
 
-      const saved = localStorage.getItem('affilianze_chat_messages')
-      const messageMap = saved ? JSON.parse(saved) : {}
-      messageMap[partnerId] = [...(messageMap[partnerId] || []), aiMsg]
-      localStorage.setItem('affilianze_chat_messages', JSON.stringify(messageMap))
+      const latestSaved = localStorage.getItem('affilianze_chat_messages')
+      const latestMap = latestSaved ? JSON.parse(latestSaved) : {}
+      latestMap[partnerId] = [...(latestMap[partnerId] || []), aiMsg]
+      localStorage.setItem('affilianze_chat_messages', JSON.stringify(latestMap))
 
       setConversations(prev => prev.map(c => {
         if (c.partnerId !== partnerId) return c
