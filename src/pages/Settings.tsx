@@ -320,6 +320,17 @@ export default function Settings() {
           contactEmail: companyProfile.contactEmail
         })
         await updateProfile({ name: companyProfile.campanyName || '', phone: companyProfile.phoneNumber || '' })
+        // ✅ Upload company logo to server if a new file was selected
+        if ((companyProfile as any)._logoFile) {
+          try {
+            const formData = new FormData()
+            formData.append('file', (companyProfile as any)._logoFile)
+            await companyApi.putmylogo(formData)
+            toast.success('Company logo uploaded!')
+          } catch {
+            toast('Logo upload to server failed, saved locally only.', { icon: '⚠️' })
+          }
+        }
       }
       toast.success('Profile updated successfully!')
       activityTracker.addActivity({ description: 'Updated profile information', type: 'system' })
@@ -332,12 +343,30 @@ export default function Settings() {
     if (Object.keys(testAnswers).length < questions.length) { toast.error('Please answer all questions first'); return }
     setLoading(true)
     try {
-      const res = await submitPersonalityTest(testAnswers)
+      // ✅ Use real backend API endpoint
+      const answers = questions.map(q => ({
+        questionId: q.id,
+        answer: testAnswers[q.id] ?? 3
+      }))
+      const res = await marketerApi.postmypersonalitytest({ answers })
       setTestResult(res)
       setIsTakingTest(false)
-      toast.success('Test submitted successfully!')
+      // Clear saved progress
+      if (email) {
+        localStorage.removeItem(`affiliance_test_answers_${email}`)
+        localStorage.removeItem(`affiliance_test_progress_${email}`)
+      }
+      toast.success('Personality test submitted successfully!')
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to submit test')
+      // Fallback to local AI service if backend fails
+      try {
+        const res = await submitPersonalityTest(testAnswers)
+        setTestResult(res)
+        setIsTakingTest(false)
+        toast.success('Test submitted!')
+      } catch {
+        toast.error(err?.message || 'Failed to submit test')
+      }
     } finally { setLoading(false) }
   }
 
@@ -437,7 +466,11 @@ export default function Settings() {
                             canvas.getContext('2d')?.drawImage(img, 0, 0, w, h)
                             const dataUrl = canvas.toDataURL('image/jpeg', 0.6)
                             updateProfile({ avatar: dataUrl, avatarFile: file })
-                            toast.success(`${role?.toLowerCase() === 'company' ? 'Logo' : 'Picture'} updated!`)
+                            // Store file for company logo upload on save
+                            if (role?.toLowerCase() === 'company') {
+                              setCompanyProfile((prev: any) => ({ ...prev, _logoFile: file }))
+                            }
+                            toast.success(`${role?.toLowerCase() === 'company' ? 'Logo' : 'Picture'} updated! Click Save to upload.`)
                           }
                           img.src = reader.result as string
                         }
@@ -467,7 +500,11 @@ export default function Settings() {
                               canvas.width = w; canvas.height = h
                               canvas.getContext('2d')?.drawImage(img, 0, 0, w, h)
                               updateProfile({ avatar: canvas.toDataURL('image/jpeg', 0.6), avatarFile: file })
-                              toast.success('Updated successfully')
+                              // Store file for company logo server upload on save
+                              if (role?.toLowerCase() === 'company') {
+                                setCompanyProfile((prev: any) => ({ ...prev, _logoFile: file }))
+                              }
+                              toast.success('Updated! Click Save Settings to upload.')
                             }
                             img.src = reader.result as string
                           }

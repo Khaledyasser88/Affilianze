@@ -895,6 +895,34 @@ export interface UpdatePaymentMethodDto {
 
 export type WithdrawalStatus = 'Pending' | 'Approved' | 'Rejected' | 'Processing' | 'Completed' | 'Failed';
 
+export interface MessageDto {
+  id?: number;
+  senderId?: number;
+  senderName?: string | null;
+  receiverId?: number;
+  receiverName?: string | null;
+  content?: string | null;
+  isPromoCode?: boolean;
+  sentAt?: string;
+  isRead?: boolean;
+}
+
+export interface SendMessageDto {
+  receiverId: number;
+  content: string;
+}
+
+export interface UpdateMessageDto {
+  content: string;
+}
+
+export interface CreatePromoDto {
+  receiverId: number;
+  promoCode: string;
+  discountValue?: number;
+  description?: string | null;
+}
+
 
 
 
@@ -1368,6 +1396,27 @@ export const categoryApi = {
   },
   deletesafe: (id: number) => {
     return api.delete<boolean>(`/api/Category/${id}/safe`);
+  }
+};
+
+export const chatApi = {
+  getAll: () => {
+    return api.get<Types.MessageDto[]>(`/api/Chat/all`, { skipUnwrap: true } as any);
+  },
+  getById: (id: number) => {
+    return api.get<Types.MessageDto>(`/api/Chat/${id}`, { skipUnwrap: true } as any);
+  },
+  send: (data: Types.SendMessageDto) => {
+    return api.post<Types.MessageDto>(`/api/Chat`, data);
+  },
+  update: (id: number, data: Types.UpdateMessageDto) => {
+    return api.put<Types.MessageDto>(`/api/Chat/${id}`, data);
+  },
+  delete: (id: number) => {
+    return api.delete<any>(`/api/Chat/${id}`);
+  },
+  createPromo: (data: Types.CreatePromoDto) => {
+    return api.post<Types.MessageDto>(`/api/Chat/create-promo`, data);
   }
 };
 
@@ -1934,3 +1983,7 @@ export type UpdateNotificationPreferenceDto = Types.UpdateNotificationPreference
 export type UpdatePaymentMethodDto = Types.UpdatePaymentMethodDto;
 export type WithdrawalStatus = Types.WithdrawalStatus;
 export type LoginResponse = Types.LoginResponse;
+export type MessageDto = Types.MessageDto;
+export type SendMessageDto = Types.SendMessageDto;
+export type UpdateMessageDto = Types.UpdateMessageDto;
+export type CreatePromoDto = Types.CreatePromoDto;
