@@ -74,10 +74,53 @@ export default function Messages() {
   const [promoDesc, setPromoDesc] = useState('')
   const [useSimulatorMode, setUseSimulatorMode] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const currentUserId = getCurrentUserId()
   const { role, name: authName } = useAuth()
   const userName = authName?.split(' ')[0] || 'there'
+
+  useEffect(() => {
+    if (!showMenu) return
+    const closeMenu = () => setShowMenu(false)
+    window.addEventListener('click', closeMenu)
+    return () => window.removeEventListener('click', closeMenu)
+  }, [showMenu])
+
+  const handleClearChat = async () => {
+    setShowMenu(false)
+    if (!activePartnerId) return
+
+    if (useSimulatorMode) {
+      const saved = localStorage.getItem('affilianze_chat_messages')
+      const messageMap = saved ? JSON.parse(saved) : {}
+      messageMap[activePartnerId] = []
+      localStorage.setItem('affilianze_chat_messages', JSON.stringify(messageMap))
+      
+      setConversations(prev => prev.map(c => {
+        if (c.partnerId !== activePartnerId) return c
+        return {
+          ...c,
+          lastMessage: '',
+          lastTime: '',
+          messages: []
+        }
+      }))
+    } else {
+      try {
+        const activeConv = conversations.find(c => c.partnerId === activePartnerId)
+        if (activeConv) {
+          setLoading(true)
+          await Promise.all(activeConv.messages.map(m => chatApi.delete(m.id!)))
+          await fetchMessages()
+        }
+      } catch (err: any) {
+        console.error('Failed to clear database chat:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
 
   const buildConversations = useCallback((messages: MessageDto[]): Conversation[] => {
     const map = new Map<number, Conversation>()
@@ -669,20 +712,28 @@ Never repeat the same response. Vary your wording each time.`
                   <p className="text-[10px] text-gray-400">User #{activeConversation.partnerId}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                {useSimulatorMode && (
-                  <span className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 text-amber-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
-                    <Bot className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                    AI Agent Active
-                  </span>
-                )}
+              <div className="relative">
                 <button
-                  onClick={fetchMessages}
-                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
-                  title="Refresh messages"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowMenu(v => !v)
+                  }}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                  title="Menu"
                 >
                   <MoreVertical className="w-5 h-5" />
                 </button>
+                {showMenu && (
+                  <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-100 rounded-xl shadow-lg py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-100">
+                    <button
+                      onClick={handleClearChat}
+                      className="w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Clear Chat
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
