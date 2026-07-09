@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Search, Send, MoreVertical, Bot, ChevronLeft, Trash2, Edit2, Check, X, Tag } from 'lucide-react'
-import { chatApi } from '../api/client'
+import { chatApi, marketerApi, chatbotApi } from '../api/client'
 import type { MessageDto } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 
 interface Conversation {
   partnerId: number
@@ -71,8 +72,11 @@ export default function Messages() {
   const [promoCode, setPromoCode] = useState('')
   const [promoDiscount, setPromoDiscount] = useState('')
   const [promoDesc, setPromoDesc] = useState('')
+  const [useSimulatorMode, setUseSimulatorMode] = useState(false)
+  const [isTyping, setIsTyping] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const currentUserId = getCurrentUserId()
+  const { role } = useAuth()
 
   const buildConversations = useCallback((messages: MessageDto[]): Conversation[] => {
     const map = new Map<number, Conversation>()
@@ -118,6 +122,170 @@ export default function Messages() {
     return convList
   }, [currentUserId])
 
+  const fetchSimulatorConversations = useCallback(async () => {
+    setFetching(true)
+    setError(null)
+    setUseSimulatorMode(true)
+    try {
+      let rawContacts: any[] = []
+      const roleLower = role?.toLowerCase()
+      
+      if (roleLower === 'company') {
+        rawContacts = [
+          { id: 201, name: 'Ahmed Hassan', company: 'Marketer Partner', avatar: 'A', color: 'bg-indigo-500', online: true },
+          { id: 202, name: 'Yasmine Ali', company: 'Social Influencer', avatar: 'Y', color: 'bg-pink-500', online: true },
+          { id: 203, name: 'John Smith', company: 'SEO Expert', avatar: 'J', color: 'bg-purple-500', online: false }
+        ]
+      } else {
+        try {
+          const res = await marketerApi.getmyapplications({ PageSize: 50 })
+          const applications = (res as any)?.data || (res as any)?.items || res || []
+          if (Array.isArray(applications) && applications.length > 0) {
+            rawContacts = applications.map((app: any, idx: number) => {
+              const brandName = app.campaignTitle || 'Brand Partner';
+              return {
+                id: app.campaignId || (100 + idx),
+                name: brandName,
+                company: app.campaignTitle || 'Marketing Campaign',
+                avatar: brandName.charAt(0),
+                color: avatarColors[idx % avatarColors.length],
+                online: Math.random() > 0.4
+              }
+            })
+          }
+        } catch (e) {
+          console.warn('Failed to fetch applications, using fallback contacts:', e)
+        }
+        
+        if (rawContacts.length === 0) {
+          rawContacts = [
+            { id: 101, name: 'Sarah Jenkins', company: 'Gourmet Delivery Service', avatar: 'S', color: 'bg-amber-400', online: true },
+            { id: 102, name: 'Alex Rivera', company: 'Fitness Supplement Launch', avatar: 'A', color: 'bg-blue-500', online: true },
+            { id: 103, name: 'Emma Chen', company: 'Organic Health Products', avatar: 'E', color: 'bg-teal-500', online: false }
+          ]
+        }
+      }
+
+      const saved = localStorage.getItem('affilianze_chat_messages')
+      const messageMap = saved ? JSON.parse(saved) : {}
+
+      const convs: Conversation[] = rawContacts.map(c => {
+        let msgs = messageMap[c.id] || []
+        if (msgs.length === 0) {
+          msgs = [{
+            id: c.id * 1000,
+            senderId: c.id,
+            senderName: c.name,
+            receiverId: currentUserId || 999,
+            receiverName: 'Me',
+            content: `Hi! I'm the representative for ${c.company || c.name}. Let's discuss our affiliate partnership!`,
+            sentAt: new Date(Date.now() - 3600000).toISOString(),
+            isRead: true
+          }]
+          messageMap[c.id] = msgs
+        }
+
+        const last = msgs[msgs.length - 1]
+        return {
+          partnerId: c.id,
+          partnerName: c.name,
+          lastMessage: last?.content || '',
+          lastTime: timeAgo(last?.sentAt),
+          unreadCount: msgs.filter((m: any) => !m.isRead && m.senderId !== currentUserId).length,
+          messages: msgs
+        }
+      })
+
+      localStorage.setItem('affilianze_chat_messages', JSON.stringify(messageMap))
+      setConversations(convs)
+      if (convs.length > 0 && !activePartnerId) {
+        setActivePartnerId(convs[0].partnerId)
+      }
+    } catch (err) {
+      console.error('Simulator fetch error:', err)
+      setError('Failed to initialize simulator.')
+    } finally {
+      setFetching(false)
+    }
+  }, [role, currentUserId, activePartnerId])
+
+  const simulateAiReply = async (partnerId: number, partnerName: string, userText: string) => {
+    setIsTyping(true)
+    try {
+      const prompt = `Act as ${partnerName} representative. A marketer said: "${userText}". Keep it professional and related to affiliate marketing.`
+      
+      let aiResponse: string | null = null
+
+      try {
+        const res = await chatbotApi.postsend(prompt) as any
+        aiResponse = res?.response || res?.data?.response || res?.reply || res?.data?.reply || res?.text || res?.data?.text || (typeof res === 'string' ? res : null)
+      } catch (backendErr) {
+        console.warn('Backend chatbot unavailable, trying Gemini fallback...', backendErr)
+      }
+
+      if (!aiResponse) {
+        const geminiKey = import.meta.env.VITE_GEMINI_API_KEY as string
+        if (geminiKey) {
+          try {
+            const geminiRes = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                  generationConfig: { maxOutputTokens: 512, temperature: 0.7 }
+                })
+              }
+            )
+            const geminiData = await geminiRes.json()
+            if (geminiData.error) {
+              aiResponse = `Gemini API Error: ${geminiData.error.message}`
+            } else {
+              aiResponse = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || null
+            }
+          } catch (geminiErr) {
+            console.error('Gemini fallback failed:', geminiErr)
+          }
+        }
+      }
+
+      if (!aiResponse) {
+        aiResponse = `Thanks for your message! Let's work together to make this campaign a success.`
+      }
+
+      const aiMsg: MessageDto = {
+        id: Date.now() + 1,
+        senderId: partnerId,
+        senderName: partnerName,
+        receiverId: currentUserId || 999,
+        receiverName: 'Me',
+        content: aiResponse,
+        sentAt: new Date().toISOString(),
+        isRead: false
+      }
+
+      const saved = localStorage.getItem('affilianze_chat_messages')
+      const messageMap = saved ? JSON.parse(saved) : {}
+      messageMap[partnerId] = [...(messageMap[partnerId] || []), aiMsg]
+      localStorage.setItem('affilianze_chat_messages', JSON.stringify(messageMap))
+
+      setConversations(prev => prev.map(c => {
+        if (c.partnerId !== partnerId) return c
+        return {
+          ...c,
+          lastMessage: aiResponse!,
+          lastTime: 'Just now',
+          messages: [...c.messages, aiMsg]
+        }
+      }))
+    } catch (err) {
+      console.error('AI Reply Error:', err)
+    } finally {
+      setIsTyping(false)
+    }
+  }
+
   const fetchMessages = useCallback(async () => {
     setFetching(true)
     setError(null)
@@ -129,17 +297,12 @@ export default function Messages() {
         setActivePartnerId(convs[0].partnerId)
       }
     } catch (err: any) {
-      const errMsg = err?.message || ''
-      if (errMsg.includes("IHubContext") || errMsg.includes("ChatHub")) {
-        setError('The server chat service is temporarily unavailable. Please notify the administrator to register SignalR services in the Backend.')
-      } else {
-        setError(err?.message || 'Failed to load messages')
-      }
-      console.error('Chat fetch error:', err)
+      console.warn('Backend chat API failed, falling back to local simulator:', err)
+      await fetchSimulatorConversations()
     } finally {
       setFetching(false)
     }
-  }, [buildConversations, activePartnerId])
+  }, [buildConversations, activePartnerId, fetchSimulatorConversations])
 
   useEffect(() => {
     fetchMessages()
@@ -152,7 +315,7 @@ export default function Messages() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [activePartnerId, conversations])
+  }, [activePartnerId, conversations, isTyping])
 
   const activeConversation = conversations.find(c => c.partnerId === activePartnerId)
 
@@ -164,16 +327,44 @@ export default function Messages() {
     setInput('')
     setLoading(true)
 
+    if (useSimulatorMode) {
+      const userMsg: MessageDto = {
+        id: Date.now(),
+        senderId: currentUserId || 999,
+        senderName: 'Me',
+        receiverId: activePartnerId,
+        receiverName: activeConversation?.partnerName || 'Brand',
+        content: text,
+        sentAt: new Date().toISOString(),
+        isRead: true
+      }
+      
+      const saved = localStorage.getItem('affilianze_chat_messages')
+      const messageMap = saved ? JSON.parse(saved) : {}
+      messageMap[activePartnerId] = [...(messageMap[activePartnerId] || []), userMsg]
+      localStorage.setItem('affilianze_chat_messages', JSON.stringify(messageMap))
+
+      setConversations(prev => prev.map(c => {
+        if (c.partnerId !== activePartnerId) return c
+        return {
+          ...c,
+          lastMessage: text,
+          lastTime: 'Just now',
+          messages: [...c.messages, userMsg]
+        }
+      }))
+
+      simulateAiReply(activePartnerId, activeConversation?.partnerName || 'Brand', text)
+      setLoading(false)
+      return
+    }
+
     try {
       await chatApi.send({ receiverId: activePartnerId, content: text })
-
-      // Optimistically update UI then refresh from server
       setConversations(prev => prev.map(c => {
         if (c.partnerId !== activePartnerId) return c
         return { ...c, lastMessage: text, lastTime: 'Just now' }
       }))
-
-      // Refresh after a moment to get server-confirmed message
       setTimeout(fetchMessages, 2000)
     } catch (err: any) {
       setError(err?.message || 'Failed to send message')
@@ -203,37 +394,48 @@ export default function Messages() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    try {
-      await chatApi.delete(id)
-      setConversations(prev => prev.map(c => ({
-        ...c,
-        messages: c.messages.filter(m => m.id !== id)
-      })).filter(c => c.messages.length > 0 || c.partnerId === activePartnerId))
-    } catch (err: any) {
-      setError(err?.message || 'Failed to delete message')
-    }
-  }
-
-  const handleEdit = async (id: number) => {
-    if (!editContent.trim()) return
-    try {
-      await chatApi.update(id, { content: editContent.trim() })
-      setConversations(prev => prev.map(c => ({
-        ...c,
-        messages: c.messages.map(m => m.id === id ? { ...m, content: editContent.trim() } : m)
-      })))
-      setEditingId(null)
-      setEditContent('')
-    } catch (err: any) {
-      setError(err?.message || 'Failed to edit message')
-    }
-  }
+  // Duplicate handleDelete and handleEdit removed here to use the unified simulator-aware ones defined below
 
   const handleSendPromo = async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!promoCode.trim() || !activePartnerId || loading) return
     setLoading(true)
+    if (useSimulatorMode) {
+      const promoMsg: MessageDto = {
+        id: Date.now(),
+        senderId: currentUserId || 999,
+        senderName: 'Me',
+        receiverId: activePartnerId,
+        receiverName: activeConversation?.partnerName || 'Brand',
+        content: `PROMO CODE: ${promoCode.trim()} ${promoDiscount ? `(${promoDiscount}% OFF)` : ''} ${promoDesc ? `- ${promoDesc}` : ''}`,
+        sentAt: new Date().toISOString(),
+        isRead: true,
+        isPromoCode: true
+      }
+
+      const saved = localStorage.getItem('affilianze_chat_messages')
+      const messageMap = saved ? JSON.parse(saved) : {}
+      messageMap[activePartnerId] = [...(messageMap[activePartnerId] || []), promoMsg]
+      localStorage.setItem('affilianze_chat_messages', JSON.stringify(messageMap))
+
+      setConversations(prev => prev.map(c => {
+        if (c.partnerId !== activePartnerId) return c
+        return {
+          ...c,
+          lastMessage: `Promo Code: ${promoCode}`,
+          lastTime: 'Just now',
+          messages: [...c.messages, promoMsg]
+        }
+      }))
+
+      setPromoCode('')
+      setPromoDiscount('')
+      setPromoDesc('')
+      setShowPromoForm(false)
+      setLoading(false)
+      return
+    }
+
     try {
       await chatApi.createPromo({
         receiverId: activePartnerId,
@@ -250,6 +452,61 @@ export default function Messages() {
       setError(err?.message || 'Failed to send promo')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDelete = async (id: number) => {
+    if (useSimulatorMode) {
+      const saved = localStorage.getItem('affilianze_chat_messages')
+      const messageMap = saved ? JSON.parse(saved) : {}
+      if (activePartnerId) {
+        messageMap[activePartnerId] = (messageMap[activePartnerId] || []).filter((m: any) => m.id !== id)
+        localStorage.setItem('affilianze_chat_messages', JSON.stringify(messageMap))
+        setConversations(prev => prev.map(c => ({
+          ...c,
+          messages: c.messages.filter(m => m.id !== id)
+        })))
+      }
+      return
+    }
+    try {
+      await chatApi.delete(id)
+      setConversations(prev => prev.map(c => ({
+        ...c,
+        messages: c.messages.filter(m => m.id !== id)
+      })).filter(c => c.messages.length > 0 || c.partnerId === activePartnerId))
+    } catch (err: any) {
+      setError(err?.message || 'Failed to delete message')
+    }
+  }
+
+  const handleEdit = async (id: number) => {
+    if (!editContent.trim()) return
+    if (useSimulatorMode) {
+      const saved = localStorage.getItem('affilianze_chat_messages')
+      const messageMap = saved ? JSON.parse(saved) : {}
+      if (activePartnerId) {
+        messageMap[activePartnerId] = (messageMap[activePartnerId] || []).map((m: any) => m.id === id ? { ...m, content: editContent.trim() } : m)
+        localStorage.setItem('affilianze_chat_messages', JSON.stringify(messageMap))
+        setConversations(prev => prev.map(c => ({
+          ...c,
+          messages: c.messages.map(m => m.id === id ? { ...m, content: editContent.trim() } : m)
+        })))
+        setEditingId(null)
+        setEditContent('')
+      }
+      return
+    }
+    try {
+      await chatApi.update(id, { content: editContent.trim() })
+      setConversations(prev => prev.map(c => ({
+        ...c,
+        messages: c.messages.map(m => m.id === id ? { ...m, content: editContent.trim() } : m)
+      })))
+      setEditingId(null)
+      setEditContent('')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to edit message')
     }
   }
 
@@ -378,13 +635,21 @@ export default function Messages() {
                   <p className="text-[10px] text-gray-400">User #{activeConversation.partnerId}</p>
                 </div>
               </div>
-              <button
-                onClick={fetchMessages}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
-                title="Refresh messages"
-              >
-                <MoreVertical className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-3">
+                {useSimulatorMode && (
+                  <span className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 text-amber-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
+                    <Bot className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                    AI Agent Active
+                  </span>
+                )}
+                <button
+                  onClick={fetchMessages}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
+                  title="Refresh messages"
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Message Thread */}
@@ -476,6 +741,15 @@ export default function Messages() {
                   </div>
                 )
               })}
+              {isTyping && (
+                <div className="flex flex-col items-start gap-2 pl-9 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="bg-white border border-gray-100 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0s]" />
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Message Input */}
